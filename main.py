@@ -6,7 +6,8 @@ from app.sentence.route import sentence_route
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    init_db()
+    # 若使用Alembic管理数据库请注销init_db()
+    # init_db()
     yield
     close_db()
 

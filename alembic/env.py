@@ -1,24 +1,30 @@
 from logging.config import fileConfig
-from config import config as fastapi_config
+from config import fastapi_config
+from sqlmodel import SQLModel
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-
 from alembic import context
+
+# 导入模型区域
+from app.sentence import model as sentence_model
+
+# 在这里使用数据库模型
+_ = sentence_model
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
+database_url = str(fastapi_config.SQLMODEL_DATABASE_URI)
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
+
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
+target_metadata = SQLModel.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

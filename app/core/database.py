@@ -1,15 +1,15 @@
 from sqlmodel import SQLModel, create_engine, Session
-from config import config
+from config import fastapi_config
 from fastapi import Depends
 from typing import Annotated
 
-# 这里要导入所有的模型
+# 如果使用SQLMODEL创建数据库表请在这里导入所有的模型
 from app.sentence import model as sentence_model
 
 _ = sentence_model
 
 engine = create_engine(
-    str(config.SQLMODEL_DATABASE_URI),
+    str(fastapi_config.SQLMODEL_DATABASE_URI),
     pool_pre_ping=True,
 )
 

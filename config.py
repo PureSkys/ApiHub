@@ -33,4 +33,4 @@ class Settings(BaseSettings):
         )
 
 
-config: Settings = Settings()
+fastapi_config: Settings = Settings()
