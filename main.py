@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+
+from app.auth.route import auth_router
 from app.core.database import init_db, close_db
 from app.sentence.route import sentence_route
 
@@ -19,3 +21,4 @@ app = FastAPI(
 )
 
 app.include_router(sentence_route, prefix="/sentence", tags=["Sentence"])
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])

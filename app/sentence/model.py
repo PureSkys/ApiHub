@@ -12,9 +12,11 @@ class SentenceCategoryModel(SQLModel, table=True):
         default_factory=uuid.uuid7,
         primary_key=True,
         index=True,
+        unique=True,
+        nullable=False,
     )
     # 句子分类字段
-    category: str = Field(..., nullable=False, unique=True, index=True)
+    category: str = Field(nullable=False, unique=True, index=True)
     created_at: datetime = Field(
         sa_column=Column(DateTime, default=func.now(), nullable=False)
     )
@@ -35,9 +37,11 @@ class SentenceContentModel(SQLModel, table=True):
         default_factory=uuid.uuid7,
         primary_key=True,
         index=True,
+        unique=True,
+        nullable=False,
     )
     # 句子内容
-    content: str = Field(..., nullable=False, unique=True, index=True)
+    content: str = Field(nullable=False, unique=True, index=True)
     # 句子来源
     from_source: str | None = Field(default=None, nullable=True)
     # 句子作者
@@ -58,6 +62,22 @@ class SentenceContentModel(SQLModel, table=True):
         foreign_key="sentence_category.id", nullable=False, ondelete="CASCADE"
     )
     category: SentenceCategoryModel = Relationship(back_populates="sentences")
+
+
+# 句子集用户权限模型
+class SentenceUserConfigModel(SQLModel, table=True):
+    __tablename__ = "sentence_user_config"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid7,
+        primary_key=True,
+        index=True,
+        unique=True,
+        nullable=False,
+    )
+    is_superuser: bool = Field(default=False, nullable=False)
+    user_id: uuid.UUID = Field(foreign_key="user.id", nullable=False, unique=True)
+    user: "UserModel" = Relationship(back_populates="sentence_user_config")
 
 
 # 分类创建/更新入参模型
@@ -100,3 +120,6 @@ class SentenceResponse(SQLModel):
     created_at: datetime
     updated_at: datetime
     category: CategoryResponse
+
+
+from app.auth.model import UserModel
