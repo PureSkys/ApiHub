@@ -23,7 +23,9 @@ class SentenceCategoryModel(SQLModel, table=True):
             DateTime, default=func.now(), nullable=False, onupdate=func.now()
         )
     )
-    sentences: list["SentenceContentModel"] = Relationship(back_populates="category")
+    sentences: list["SentenceContentModel"] = Relationship(
+        back_populates="category", passive_deletes=True
+    )
 
 
 # 数据库句子内容表模型
@@ -35,7 +37,7 @@ class SentenceContentModel(SQLModel, table=True):
         index=True,
     )
     # 句子内容
-    content: str = Field(..., nullable=False)
+    content: str = Field(..., nullable=False, unique=True, index=True)
     # 句子来源
     from_source: str | None = Field(default=None, nullable=True)
     # 句子作者
@@ -52,7 +54,9 @@ class SentenceContentModel(SQLModel, table=True):
             DateTime, default=func.now(), nullable=False, onupdate=func.now()
         )
     )
-    category_id: uuid.UUID = Field(foreign_key="sentence_category.id", nullable=False)
+    category_id: uuid.UUID = Field(
+        foreign_key="sentence_category.id", nullable=False, ondelete="CASCADE"
+    )
     category: SentenceCategoryModel = Relationship(back_populates="sentences")
 
 

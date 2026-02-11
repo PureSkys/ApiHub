@@ -1,5 +1,5 @@
-from fastapi import APIRouter, status, Body, Path
-from enum import Enum
+import uuid
+from fastapi import APIRouter, status, Body, Path, Query
 from app.sentence.model import (
     SentenceResponse,
     SentenceUpdateAndCreate,
@@ -12,22 +12,6 @@ import app.sentence.server as server
 sentence_route = APIRouter()
 
 
-class SENTENCE_CATEGORY(str, Enum):
-    动画 = "动画"
-    漫画 = "漫画"
-    游戏 = "游戏"
-    文学 = "文学"
-    原创 = "原创"
-    网络 = "网络"
-    其他 = "其他"
-    影视 = "影视"
-    诗词 = "诗词"
-    网易云 = "网易云"
-    哲学 = "哲学"
-    抖机灵 = "抖机灵"
-    全部 = "全部"
-
-
 @sentence_route.post(
     "/category",
     summary="创建分类路由",
@@ -35,7 +19,8 @@ class SENTENCE_CATEGORY(str, Enum):
     status_code=status.HTTP_201_CREATED,
 )
 def create_sentence_category_route(
-    session: SessionDep, category: CategoryUpdateAndCreate
+    session: SessionDep,
+    category: CategoryUpdateAndCreate = Body(...),
 ):
     category_db = server.create_sentence_category(session, category)
     return category_db
@@ -44,7 +29,7 @@ def create_sentence_category_route(
 @sentence_route.delete(
     "/category/{_id}", summary="删除分类路由", status_code=status.HTTP_200_OK
 )
-def delete_sentence_category_route(session: SessionDep, _id: str = Path(...)):
+def delete_sentence_category_route(session: SessionDep, _id: uuid.UUID = Path(...)):
     result = server.delete_sentence_category(session, _id)
     return result
 
@@ -57,7 +42,7 @@ def delete_sentence_category_route(session: SessionDep, _id: str = Path(...)):
 )
 def update_sentence_category_route(
     session: SessionDep,
-    _id: str = Path(...),
+    _id: uuid.UUID = Path(...),
     category_update: CategoryUpdateAndCreate = Body(...),
 ):
     result = server.update_sentence_category(session, _id, category_update)
@@ -75,7 +60,6 @@ def get_sentence_category_route(session: SessionDep):
     return result
 
 
-# TODO:句子内容相关路由
 @sentence_route.post(
     "/",
     summary="创建句子路由",
@@ -83,43 +67,47 @@ def get_sentence_category_route(session: SessionDep):
     status_code=status.HTTP_201_CREATED,
 )
 def create_sentence_route(
-    session: SessionDep, sentence_create: SentenceUpdateAndCreate
+    session: SessionDep, sentence_create: SentenceUpdateAndCreate = Body(...)
 ):
     sentence = server.create_sentence(session, sentence_create)
     return sentence
 
 
 @sentence_route.delete(
-    "/{uuid}",
+    "/{_id}",
     summary="删除句子路由",
     status_code=status.HTTP_200_OK,
 )
-def delete_sentence_route(session: SessionDep, uuid: str = Path(...)):
-    result = server.delete_sentence(session, uuid)
+def delete_sentence_route(session: SessionDep, _id: uuid.UUID = Path(...)):
+    result = server.delete_sentence(session, _id)
     return result
 
 
 @sentence_route.put(
-    "/{uuid}",
+    "/{_id}",
     summary="更新句子路由",
     response_model=SentenceResponse,
     status_code=status.HTTP_200_OK,
 )
 def update_sentence_route(
     session: SessionDep,
-    uuid: str = Path(...),
+    _id: uuid.UUID = Path(...),
     sentence_update: SentenceUpdateAndCreate = Body(...),
 ):
-    sentence = server.update_sentence(session, uuid, sentence_update)
+    sentence = server.update_sentence(session, _id, sentence_update)
     return sentence
 
 
 @sentence_route.get(
-    "/{category}",
+    "/{category_id}",
     summary="查询句子路由",
     response_model=list[SentenceResponse],
     status_code=status.HTTP_200_OK,
 )
-def get_sentence_route(session: SessionDep, category: SENTENCE_CATEGORY):
-    sentences = server.get_sentence(session, category)
+def get_sentence_route(
+    session: SessionDep,
+    category_id: str = Path(...),
+    limit: int = Query(10, ge=1, le=20),
+):
+    sentences = server.get_sentence(session, category_id, limit)
     return sentences
