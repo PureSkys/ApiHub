@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, status
+from fastapi import APIRouter, Body, status, File, UploadFile
 
 from app.auth.model import UserResponse, UserCreateAndUpdate
 from app.auth.server import create_user

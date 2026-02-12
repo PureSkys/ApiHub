@@ -1,5 +1,5 @@
 from logging.config import fileConfig
-from config import fastapi_config
+from app.config import fastapi_config
 from sqlmodel import SQLModel
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
