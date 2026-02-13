@@ -76,7 +76,9 @@ class SentenceUserConfigModel(SQLModel, table=True):
         nullable=False,
     )
     is_superuser: bool = Field(default=False, nullable=False)
-    user_id: uuid.UUID = Field(foreign_key="user.id", nullable=False, unique=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, unique=True, ondelete="CASCADE"
+    )
     user: "UserModel" = Relationship(back_populates="sentence_user_config")
 
 
@@ -122,4 +124,4 @@ class SentenceResponse(SQLModel):
     category: CategoryResponse
 
 
-from app.auth.model import UserModel
+from app.user.model import UserModel

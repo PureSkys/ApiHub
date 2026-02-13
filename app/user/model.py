@@ -1,6 +1,5 @@
 import uuid
-
-from pydantic import EmailStr
+from pydantic import BaseModel, EmailStr
 from sqlmodel import SQLModel, Field, Relationship
 
 
@@ -20,9 +19,21 @@ class UserModel(SQLModel, table=True):
     nickname: str | None = Field(description="用户昵称", default=None, nullable=True)
     active: bool = Field(description="用户状态", nullable=False, default=False)
     is_superuser: bool = Field(description="超级管理员状态", default=False)
+    # 下面关联项目内其他应用的模型
     sentence_user_config: "SentenceUserConfigModel" = Relationship(
         back_populates="user"
     )
+
+
+# Token模型(返回给前端)
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+# Token内的负载 sub
+class TokenData(BaseModel):
+    id: str | None = None
 
 
 # 用户响应模型

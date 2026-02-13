@@ -7,7 +7,7 @@ from alembic import context
 
 # 导入模型区域
 from app.sentence import model as sentence_model
-from app.auth import model as auth_model
+from app.user import model as auth_model
 
 # 在这里使用数据库模型
 _ = (sentence_model, auth_model)

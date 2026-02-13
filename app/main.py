@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.auth.route import auth_router
+from app.user.route import auth_router
 from app.core.database import init_db, close_db
 from app.sentence.route import sentence_route
 
@@ -30,4 +30,4 @@ app.add_middleware(
     allow_headers=["*"],  # 允许所有请求头
 )
 app.include_router(sentence_route, prefix="/sentence", tags=["Sentence"])
-app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(auth_router, prefix="/user", tags=["Auth"])
