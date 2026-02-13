@@ -7,9 +7,10 @@ from alembic import context
 
 # 导入模型区域
 from app.sentence import model as sentence_model
+from app.auth import model as auth_model
 
 # 在这里使用数据库模型
-_ = sentence_model
+_ = (sentence_model, auth_model)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

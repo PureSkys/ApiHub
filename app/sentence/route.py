@@ -1,4 +1,5 @@
 import uuid
+from typing import Annotated
 from fastapi import APIRouter, status, Body, Path, Query
 from app.sentence.model import (
     SentenceResponse,
@@ -19,8 +20,7 @@ sentence_route = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 def create_sentence_category_route(
-    session: SessionDep,
-    category: CategoryUpdateAndCreate = Body(...),
+    session: SessionDep, category: CategoryUpdateAndCreate
 ):
     category_db = server.create_sentence_category(session, category)
     return category_db
@@ -29,7 +29,7 @@ def create_sentence_category_route(
 @sentence_route.delete(
     "/category/{_id}", summary="删除分类路由", status_code=status.HTTP_200_OK
 )
-def delete_sentence_category_route(session: SessionDep, _id: uuid.UUID = Path(...)):
+def delete_sentence_category_route(session: SessionDep, _id: uuid.UUID):
     result = server.delete_sentence_category(session, _id)
     return result
 
@@ -41,16 +41,14 @@ def delete_sentence_category_route(session: SessionDep, _id: uuid.UUID = Path(..
     status_code=status.HTTP_200_OK,
 )
 def update_sentence_category_route(
-    session: SessionDep,
-    _id: uuid.UUID = Path(...),
-    category_update: CategoryUpdateAndCreate = Body(...),
+    session: SessionDep, _id: uuid.UUID, category_update: CategoryUpdateAndCreate
 ):
     result = server.update_sentence_category(session, _id, category_update)
     return result
 
 
 @sentence_route.get(
-    "/category}",
+    "/category",
     summary="查询分类路由",
     response_model=list[CategoryResponse],
     status_code=status.HTTP_200_OK,
@@ -67,7 +65,7 @@ def get_sentence_category_route(session: SessionDep):
     status_code=status.HTTP_201_CREATED,
 )
 def create_sentence_route(
-    session: SessionDep, sentence_create: SentenceUpdateAndCreate = Body(...)
+    session: SessionDep, sentence_create: SentenceUpdateAndCreate
 ):
     sentence = server.create_sentence(session, sentence_create)
     return sentence
@@ -78,7 +76,7 @@ def create_sentence_route(
     summary="删除句子路由",
     status_code=status.HTTP_200_OK,
 )
-def delete_sentence_route(session: SessionDep, _id: uuid.UUID = Path(...)):
+def delete_sentence_route(session: SessionDep, _id: uuid.UUID):
     result = server.delete_sentence(session, _id)
     return result
 
@@ -90,9 +88,7 @@ def delete_sentence_route(session: SessionDep, _id: uuid.UUID = Path(...)):
     status_code=status.HTTP_200_OK,
 )
 def update_sentence_route(
-    session: SessionDep,
-    _id: uuid.UUID = Path(...),
-    sentence_update: SentenceUpdateAndCreate = Body(...),
+    session: SessionDep, _id: uuid.UUID, sentence_update: SentenceUpdateAndCreate
 ):
     sentence = server.update_sentence(session, _id, sentence_update)
     return sentence
@@ -106,8 +102,8 @@ def update_sentence_route(
 )
 def get_sentence_route(
     session: SessionDep,
-    category_id: str = Path(...),
-    limit: int = Query(10, ge=1, le=20),
+    category_id: str,
+    limit: Annotated[int, Query(ge=1, le=20)] = 10,
 ):
     sentences = server.get_sentence(session, category_id, limit)
     return sentences

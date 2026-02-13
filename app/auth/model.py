@@ -17,8 +17,9 @@ class UserModel(SQLModel, table=True):
     )
     email: EmailStr = Field(description="用户邮箱", nullable=False, unique=True)
     hashed_password: str = Field(description="用户密码", nullable=False)
-    nickname: str | None = Field(description="用户昵称", nullable=True)
+    nickname: str | None = Field(description="用户昵称", default=None, nullable=True)
     active: bool = Field(description="用户状态", nullable=False, default=False)
+    is_superuser: bool = Field(description="超级管理员状态", default=False)
     sentence_user_config: "SentenceUserConfigModel" = Relationship(
         back_populates="user"
     )
@@ -36,8 +37,7 @@ class UserResponse(SQLModel):
 class UserCreateAndUpdate(SQLModel):
     email: EmailStr
     hashed_password: str
-    nickname: str | None
-    active: bool = Field(default=False)
+    nickname: str | None = Field(default=None)
 
 
 from app.sentence.model import SentenceUserConfigModel
