@@ -1,11 +1,13 @@
 import uuid
 from typing import Annotated
-from fastapi import APIRouter, status, Query, Depends
+from fastapi import APIRouter, status, Query, Depends, HTTPException
+from sqlmodel import select
 from app.sentence.model import (
     SentenceResponse,
     SentenceUpdateAndCreate,
     CategoryResponse,
     CategoryUpdateAndCreate,
+    SentenceContentModel,
 )
 from app.core.database import SessionDep
 import app.sentence.server as server
@@ -26,18 +28,30 @@ def create_sentence_category_route(
     category: CategoryUpdateAndCreate,
     token: str = Depends(oauth2_scheme),
 ):
-    # ToDo权限校验
-    user_info = user_server.get_current_user(session, token)
-    category_db = server.create_sentence_category(session, category)
-    return category_db
+    sentence_user_is_superuser = user_server.get_current_user(
+        session, token
+    ).sentence_user_config.is_superuser
+    user_is_superuser = user_server.get_current_user(session, token).is_superuser
+    if sentence_user_is_superuser or user_is_superuser:
+        category_db = server.create_sentence_category(session, category)
+        return category_db
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="操作被禁止")
 
 
 @sentence_route.delete(
     "/category/{_id}", summary="删除分类路由", status_code=status.HTTP_200_OK
 )
-def delete_sentence_category_route(session: SessionDep, _id: uuid.UUID):
-    result = server.delete_sentence_category(session, _id)
-    return result
+def delete_sentence_category_route(
+    session: SessionDep, _id: uuid.UUID, token: str = Depends(oauth2_scheme)
+):
+    sentence_user_is_superuser = user_server.get_current_user(
+        session, token
+    ).sentence_user_config.is_superuser
+    user_is_superuser = user_server.get_current_user(session, token).is_superuser
+    if sentence_user_is_superuser or user_is_superuser:
+        result = server.delete_sentence_category(session, _id)
+        return result
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="操作被禁止")
 
 
 @sentence_route.put(
@@ -47,10 +61,19 @@ def delete_sentence_category_route(session: SessionDep, _id: uuid.UUID):
     status_code=status.HTTP_200_OK,
 )
 def update_sentence_category_route(
-    session: SessionDep, _id: uuid.UUID, category_update: CategoryUpdateAndCreate
+    session: SessionDep,
+    _id: uuid.UUID,
+    category_update: CategoryUpdateAndCreate,
+    token: str = Depends(oauth2_scheme),
 ):
-    result = server.update_sentence_category(session, _id, category_update)
-    return result
+    sentence_user_is_superuser = user_server.get_current_user(
+        session, token
+    ).sentence_user_config.is_superuser
+    user_is_superuser = user_server.get_current_user(session, token).is_superuser
+    if sentence_user_is_superuser or user_is_superuser:
+        result = server.update_sentence_category(session, _id, category_update)
+        return result
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="操作被禁止")
 
 
 @sentence_route.get(
@@ -71,9 +94,21 @@ def get_sentence_category_route(session: SessionDep):
     status_code=status.HTTP_201_CREATED,
 )
 def create_sentence_route(
-    session: SessionDep, sentence_create: SentenceUpdateAndCreate
+    session: SessionDep,
+    sentence_create: SentenceUpdateAndCreate,
+    token: str = Depends(oauth2_scheme),
 ):
-    sentence = server.create_sentence(session, sentence_create)
+    sentence_user_is_superuser = user_server.get_current_user(
+        session, token
+    ).sentence_user_config.is_superuser
+    user_is_superuser = user_server.get_current_user(session, token).is_superuser
+    sentence_user_id = user_server.get_current_user(
+        session, token
+    ).sentence_user_config.id
+    if sentence_user_is_superuser or user_is_superuser:
+        sentence_create.is_disabled = False
+    sentence_create.likes = 0
+    sentence = server.create_sentence(session, sentence_create, sentence_user_id)
     return sentence
 
 
@@ -82,9 +117,22 @@ def create_sentence_route(
     summary="删除句子路由",
     status_code=status.HTTP_200_OK,
 )
-def delete_sentence_route(session: SessionDep, _id: uuid.UUID):
-    result = server.delete_sentence(session, _id)
-    return result
+def delete_sentence_route(
+    session: SessionDep, _id: uuid.UUID, token: str = Depends(oauth2_scheme)
+):
+    user_info = user_server.get_current_user(session, token)
+    sentence_user_is_superuser = user_info.sentence_user_config.is_superuser
+    user_is_superuser = user_info.is_superuser
+    sentence_user_sentence_content = user_info.sentence_user_config.sentences
+    statement = select(SentenceContentModel).where(SentenceContentModel.id == _id)
+    sentence_db = session.exec(statement).first()
+    if sentence_user_is_superuser or user_is_superuser:
+        result = server.delete_sentence(session, _id)
+        return result
+    elif sentence_db in sentence_user_sentence_content:
+        result = server.delete_sentence(session, _id)
+        return result
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="操作被禁止")
 
 
 @sentence_route.put(
@@ -94,10 +142,24 @@ def delete_sentence_route(session: SessionDep, _id: uuid.UUID):
     status_code=status.HTTP_200_OK,
 )
 def update_sentence_route(
-    session: SessionDep, _id: uuid.UUID, sentence_update: SentenceUpdateAndCreate
+    session: SessionDep,
+    _id: uuid.UUID,
+    sentence_update: SentenceUpdateAndCreate,
+    token: str = Depends(oauth2_scheme),
 ):
-    sentence = server.update_sentence(session, _id, sentence_update)
-    return sentence
+    user_info = user_server.get_current_user(session, token)
+    sentence_user_is_superuser = user_info.sentence_user_config.is_superuser
+    user_is_superuser = user_info.is_superuser
+    sentence_user_sentence_content = user_info.sentence_user_config.sentences
+    statement = select(SentenceContentModel).where(SentenceContentModel.id == _id)
+    sentence_db = session.exec(statement).first()
+    if sentence_user_is_superuser or user_is_superuser:
+        sentence = server.update_sentence(session, _id, sentence_update)
+        return sentence
+    elif sentence_db in sentence_user_sentence_content:
+        sentence = server.update_sentence(session, _id, sentence_update)
+        return sentence
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="操作被禁止")
 
 
 @sentence_route.get(

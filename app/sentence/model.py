@@ -38,6 +38,8 @@ class SentenceContentModel(SQLModel, table=True):
     )
     category_id: uuid.UUID = Field(foreign_key="sentence_category.id")
     category: SentenceCategoryModel = Relationship(back_populates="sentences")
+    sentence_user_id: uuid.UUID = Field(foreign_key="sentence_user_config.id")
+    sentence_user: "SentenceUserConfigModel" = Relationship(back_populates="sentences")
 
 
 # 句子集用户权限模型
@@ -50,6 +52,10 @@ class SentenceUserConfigModel(SQLModel, table=True):
     is_superuser: bool = Field(default=False)
     user_id: uuid.UUID = Field(foreign_key="user.id", unique=True)
     user: "UserModel" = Relationship(back_populates="sentence_user_config")
+    sentences: list["SentenceContentModel"] = Relationship(
+        back_populates="sentence_user",
+        cascade_delete=True,
+    )
 
 
 # 分类创建/更新入参模型
