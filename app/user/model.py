@@ -8,20 +8,17 @@ class UserModel(SQLModel, table=True):
     __tablename__ = "user"
 
     id: uuid.UUID = Field(
-        default_factory=uuid.uuid7,
-        primary_key=True,
-        index=True,
-        unique=True,
-        nullable=False,
+        default_factory=uuid.uuid7, primary_key=True, index=True, unique=True
     )
-    email: EmailStr = Field(description="用户邮箱", nullable=False, unique=True)
-    hashed_password: str = Field(description="用户密码", nullable=False)
-    nickname: str | None = Field(description="用户昵称", default=None, nullable=True)
-    active: bool = Field(description="用户状态", nullable=False, default=False)
+    email: EmailStr = Field(description="用户邮箱", unique=True, max_length=255)
+    hashed_password: str = Field(description="用户密码")
+    nickname: str | None = Field(description="用户昵称", default=None, max_length=8)
+    active: bool = Field(description="用户状态", default=False)
     is_superuser: bool = Field(description="超级管理员状态", default=False)
     # 下面关联项目内其他应用的模型
     sentence_user_config: "SentenceUserConfigModel" = Relationship(
-        back_populates="user"
+        back_populates="user",
+        cascade_delete=True,
     )
 
 

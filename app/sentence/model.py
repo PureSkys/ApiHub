@@ -9,24 +9,15 @@ from pydantic import field_validator
 class SentenceCategoryModel(SQLModel, table=True):
     __tablename__ = "sentence_category"
     id: uuid.UUID = Field(
-        default_factory=uuid.uuid7,
-        primary_key=True,
-        index=True,
-        unique=True,
-        nullable=False,
+        default_factory=uuid.uuid7, primary_key=True, index=True, unique=True
     )
-    # 句子分类字段
-    category: str = Field(nullable=False, unique=True, index=True)
-    created_at: datetime = Field(
-        sa_column=Column(DateTime, default=func.now(), nullable=False)
-    )
+    category: str = Field(description="句子分类", unique=True, index=True)
+    created_at: datetime = Field(sa_column=Column(DateTime, default=func.now()))
     updated_at: datetime = Field(
-        sa_column=Column(
-            DateTime, default=func.now(), nullable=False, onupdate=func.now()
-        )
+        sa_column=Column(DateTime, default=func.now(), onupdate=func.now())
     )
     sentences: list["SentenceContentModel"] = Relationship(
-        back_populates="category", passive_deletes=True
+        back_populates="category", cascade_delete=True
     )
 
 
@@ -34,33 +25,17 @@ class SentenceCategoryModel(SQLModel, table=True):
 class SentenceContentModel(SQLModel, table=True):
     __tablename__ = "sentence_content"
     id: uuid.UUID = Field(
-        default_factory=uuid.uuid7,
-        primary_key=True,
-        index=True,
-        unique=True,
-        nullable=False,
+        default_factory=uuid.uuid7, primary_key=True, index=True, unique=True
     )
-    # 句子内容
-    content: str = Field(nullable=False, unique=True, index=True)
-    # 句子来源
-    from_source: str | None = Field(default=None, nullable=True)
-    # 句子作者
-    from_who: str | None = Field(default=None, nullable=True)
-    # 句子喜欢数
-    likes: int = Field(default=0, nullable=False)
-    # 创建时间
-    created_at: datetime = Field(
-        sa_column=Column(DateTime, default=func.now(), nullable=False)
-    )
-    # 更新时间
+    content: str = Field(description="句子内容", unique=True, index=True)
+    from_source: str | None = Field(description="句子来源", default=None)
+    from_who: str | None = Field(description="句子作者", default=None)
+    likes: int = Field(description="句子喜欢数", default=0, ge=0)
+    created_at: datetime = Field(sa_column=Column(DateTime, default=func.now()))
     updated_at: datetime = Field(
-        sa_column=Column(
-            DateTime, default=func.now(), nullable=False, onupdate=func.now()
-        )
+        sa_column=Column(DateTime, default=func.now(), onupdate=func.now())
     )
-    category_id: uuid.UUID = Field(
-        foreign_key="sentence_category.id", nullable=False, ondelete="CASCADE"
-    )
+    category_id: uuid.UUID = Field(foreign_key="sentence_category.id")
     category: SentenceCategoryModel = Relationship(back_populates="sentences")
 
 
@@ -69,16 +44,10 @@ class SentenceUserConfigModel(SQLModel, table=True):
     __tablename__ = "sentence_user_config"
 
     id: uuid.UUID = Field(
-        default_factory=uuid.uuid7,
-        primary_key=True,
-        index=True,
-        unique=True,
-        nullable=False,
+        default_factory=uuid.uuid7, primary_key=True, index=True, unique=True
     )
-    is_superuser: bool = Field(default=False, nullable=False)
-    user_id: uuid.UUID = Field(
-        foreign_key="user.id", nullable=False, unique=True, ondelete="CASCADE"
-    )
+    is_superuser: bool = Field(default=False)
+    user_id: uuid.UUID = Field(foreign_key="user.id", unique=True)
     user: "UserModel" = Relationship(back_populates="sentence_user_config")
 
 

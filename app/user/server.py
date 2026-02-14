@@ -7,7 +7,6 @@ from app.user.model import UserCreateAndUpdate, UserModel, TokenData
 from app.sentence.model import SentenceUserConfigModel
 from datetime import datetime, timedelta, timezone
 from app.config import fastapi_config
-from typing import Annotated
 
 password_hash = PasswordHash.recommended()
 
@@ -55,7 +54,6 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 # 解密token方法
 def encode_token(token: str):
-    print(jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM]))
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
 
