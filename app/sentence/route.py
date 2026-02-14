@@ -72,12 +72,12 @@ def get_sentence_category_route(session: SessionDep):
 @sentence_route.post(
     "/",
     summary="创建句子路由",
-    response_model=SentenceResponse,
+    response_model=SentenceResponse | list[SentenceResponse],
     status_code=status.HTTP_201_CREATED,
 )
 def create_sentence_route(
     session: SessionDep,
-    sentence_create: SentenceUpdateAndCreate,
+    sentence_create: SentenceUpdateAndCreate | list[SentenceUpdateAndCreate],
     token: str = Depends(oauth2_scheme),
 ):
     sentence = server.create_sentence(session, sentence_create, token)

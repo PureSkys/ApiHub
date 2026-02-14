@@ -127,41 +127,90 @@ def get_sentence_category(session: Session):
         raise HTTPException(status_code=500, detail="查询分类失败，请联系管理员！")
 
 
-# 创建句子方法
 def create_sentence(
     session: Session,
-    sentence_create: SentenceUpdateAndCreate,
+    sentence_create: SentenceUpdateAndCreate | list[SentenceUpdateAndCreate],
     token: str,
 ):
+    # 获取用户基础信息
     (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = (
         get_basic_info(session, token)
     )
-    if sentence_user_is_superuser or user_is_superuser:
-        sentence_create.is_disabled = False
+    # 判断是否为超级用户，用于设置is_disabled属性
+    is_superuser = sentence_user_is_superuser or user_is_superuser
+    # 统一转为列表处理，简化逻辑
+    if not isinstance(sentence_create, list):
+        sentence_creates = [sentence_create]
+        is_single = True
     else:
-        sentence_create.is_disabled = True
-    sentence_create.likes = 0
+        sentence_creates = sentence_create
+        is_single = False
+    # 存储要创建的句子对象
+    sentence_objects = []
     try:
-        statement = select(SentenceContentModel).where(
-            SentenceContentModel.content == sentence_create.content
-        )
-        sentence_db: SentenceContentModel = session.exec(statement).first()
-        if sentence_db:
+        # 第一步：提取所有待创建的句子内容
+        contents = [item.content for item in sentence_creates]
+        # 检查1：待创建列表内部是否有重复内容
+        content_count = {}
+        for content in contents:
+            content_count[content] = content_count.get(content, 0) + 1
+        # 找出列表内重复的内容
+        internal_duplicates = [
+            content for content, count in content_count.items() if count > 1
+        ]
+        if internal_duplicates:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"句子「{sentence_db.content}」已存在，无法重复创建！",
+                detail=f"待创建列表中句子「{', '.join(internal_duplicates)}」重复，无法创建！",
             )
-        sentence_dict = sentence_create.model_dump(exclude_unset=True)
-        sentence_db = SentenceContentModel(
-            **sentence_dict, sentence_user_id=sentence_user_id
+        # 检查2：检查数据库中已存在的内容
+        statement = select(SentenceContentModel.content).where(
+            SentenceContentModel.content.in_(contents)
         )
-        session.add(sentence_db)
+        # 正确获取查询结果中的内容字符串
+        existing_contents = []
+        for row in session.exec(statement).all():
+            # 兼容不同SQLAlchemy版本的返回格式（可能是元组或单个值）
+            if isinstance(row, (tuple, list)):
+                existing_contents.append(row[0])
+            else:
+                existing_contents.append(row)
+        # 转换为集合提高查询效率
+        existing_contents_set = set(existing_contents)
+        # 找出和数据库重复的内容
+        db_duplicates = [
+            content for content in contents if content in existing_contents_set
+        ]
+        if db_duplicates:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"句子「{', '.join(db_duplicates)}」已存在于数据库中，无法重复创建！",
+            )
+        # 第二步：处理每个句子对象
+        for item in sentence_creates:
+            # 设置权限相关字段
+            item.is_disabled = False if is_superuser else True
+            # 初始化点赞数
+            item.likes = 0
+            # 转换为字典并创建数据库模型对象
+            sentence_dict = item.model_dump(exclude_unset=True)
+            sentence_db = SentenceContentModel(
+                **sentence_dict, sentence_user_id=sentence_user_id
+            )
+            sentence_objects.append(sentence_db)
+        # 第三步：批量添加并提交
+        session.add_all(sentence_objects)
         session.commit()
-        session.refresh(sentence_db)
-        return sentence_db
+        # 刷新所有对象以获取数据库生成的字段（如id）
+        for obj in sentence_objects:
+            session.refresh(obj)
+        # 根据输入类型返回对应结果
+        return sentence_objects[0] if is_single else sentence_objects
     except HTTPException:
+        # 主动抛出的HTTP异常直接向上传递
         raise
     except Exception as e:
+        # 其他异常回滚事务并返回通用错误
         session.rollback()
         print(f"创建句子失败：{str(e)}")
         raise HTTPException(status_code=400, detail="创建句子失败，请联系管理员！")
