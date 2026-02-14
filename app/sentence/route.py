@@ -72,6 +72,7 @@ def get_sentence_category_route(session: SessionDep):
 @sentence_route.post(
     "/",
     summary="创建句子路由",
+    description="可以通过数组批量创建",
     response_model=SentenceResponse | list[SentenceResponse],
     status_code=status.HTTP_201_CREATED,
 )
