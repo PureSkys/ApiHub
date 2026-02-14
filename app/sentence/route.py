@@ -1,6 +1,6 @@
 import uuid
 from typing import Annotated
-from fastapi import APIRouter, status, Body, Path, Query
+from fastapi import APIRouter, status, Query, Depends
 from app.sentence.model import (
     SentenceResponse,
     SentenceUpdateAndCreate,
@@ -9,6 +9,8 @@ from app.sentence.model import (
 )
 from app.core.database import SessionDep
 import app.sentence.server as server
+from app.user.route import oauth2_scheme
+from app.user import server as user_server
 
 sentence_route = APIRouter()
 
@@ -20,8 +22,12 @@ sentence_route = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 def create_sentence_category_route(
-    session: SessionDep, category: CategoryUpdateAndCreate
+    session: SessionDep,
+    category: CategoryUpdateAndCreate,
+    token: str = Depends(oauth2_scheme),
 ):
+    # ToDo权限校验
+    user_info = user_server.get_current_user(session, token)
     category_db = server.create_sentence_category(session, category)
     return category_db
 

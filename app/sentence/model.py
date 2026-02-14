@@ -27,6 +27,7 @@ class SentenceContentModel(SQLModel, table=True):
     id: uuid.UUID = Field(
         default_factory=uuid.uuid7, primary_key=True, index=True, unique=True
     )
+    is_disabled: bool = Field(description="句子状态", default=True)
     content: str = Field(description="句子内容", unique=True, index=True)
     from_source: str | None = Field(description="句子来源", default=None)
     from_who: str | None = Field(description="句子作者", default=None)
@@ -75,6 +76,7 @@ class CategoryResponse(SQLModel):
 # 句子创建/更新入参模型
 class SentenceUpdateAndCreate(SQLModel):
     category_id: uuid.UUID  # 关联分类的UUID
+    is_disabled: bool = True
     content: str
     from_source: str | None = None
     from_who: str | None = None

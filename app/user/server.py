@@ -53,8 +53,16 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 # 解密token方法
-def encode_token(token: str):
-    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+def decode_token(token: str):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="无法验证凭证",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except InvalidTokenError:
+        raise credentials_exception
 
 
 # 创建用户方法
@@ -97,20 +105,8 @@ def get_user(session: Session, user_id: str):
 
 # 获取自己的用户信息方法
 def get_current_user(session: Session, token: str):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="无法验证凭证",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = encode_token(token)
-        user_id = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-        token_data = TokenData(id=user_id)
-    except InvalidTokenError:
-        raise credentials_exception
+    payload = decode_token(token)
+    user_id = payload.get("sub")
+    token_data = TokenData(id=user_id)
     user = get_user(session, user_id=token_data.id)
-    if user is None:
-        raise credentials_exception
     return user
