@@ -127,6 +127,7 @@ def get_sentence_category(session: Session):
         raise HTTPException(status_code=500, detail="查询分类失败，请联系管理员！")
 
 
+# 创建句子方法
 def create_sentence(
     session: Session,
     sentence_create: SentenceUpdateAndCreate | list[SentenceUpdateAndCreate],
@@ -141,53 +142,61 @@ def create_sentence(
     # 统一转为列表处理，简化逻辑
     if not isinstance(sentence_create, list):
         sentence_creates = [sentence_create]
-        is_single = True
     else:
         sentence_creates = sentence_create
-        is_single = False
+    # 存储处理结果
+    result = {
+        "success_count": 0,
+        "internal_duplicates": [],
+        "db_duplicates": [],
+    }
     # 存储要创建的句子对象
     sentence_objects = []
     try:
-        # 第一步：提取所有待创建的句子内容
-        contents = [item.content for item in sentence_creates]
-        # 检查1：待创建列表内部是否有重复内容
-        content_count = {}
-        for content in contents:
-            content_count[content] = content_count.get(content, 0) + 1
-        # 找出列表内重复的内容
-        internal_duplicates = [
-            content for content, count in content_count.items() if count > 1
-        ]
-        if internal_duplicates:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"待创建列表中句子「{', '.join(internal_duplicates)}」重复，无法创建！",
-            )
-        # 检查2：检查数据库中已存在的内容
-        statement = select(SentenceContentModel.content).where(
-            SentenceContentModel.content.in_(contents)
-        )
-        # 正确获取查询结果中的内容字符串
-        existing_contents = []
-        for row in session.exec(statement).all():
-            # 兼容不同SQLAlchemy版本的返回格式（可能是元组或单个值）
-            if isinstance(row, (tuple, list)):
-                existing_contents.append(row[0])
-            else:
-                existing_contents.append(row)
-        # 转换为集合提高查询效率
-        existing_contents_set = set(existing_contents)
-        # 找出和数据库重复的内容
-        db_duplicates = [
-            content for content in contents if content in existing_contents_set
-        ]
-        if db_duplicates:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"句子「{', '.join(db_duplicates)}」已存在于数据库中，无法重复创建！",
-            )
-        # 第二步：处理每个句子对象
+        # 第一步：去除数组内重复的content，仅保留一个
+        unique_content_items = {}
         for item in sentence_creates:
+            if item.content not in unique_content_items:
+                unique_content_items[item.content] = item
+            else:
+                result["internal_duplicates"].append(item.content)
+        # 获取去重后的内容列表
+        unique_items = list(unique_content_items.values())
+        # 提取所有待创建的句子内容
+        contents = [item.content for item in unique_items]
+
+        # 检查数据库中已存在的内容
+        if contents:
+            statement = select(SentenceContentModel.content).where(
+                SentenceContentModel.content.in_(contents)
+            )
+            # 正确获取查询结果中的内容字符串
+            existing_contents = []
+            for row in session.exec(statement).all():
+                # 兼容不同SQLAlchemy版本的返回格式（可能是元组或单个值）
+                if isinstance(row, (tuple, list)):
+                    existing_contents.append(row[0])
+                else:
+                    existing_contents.append(row)
+            # 转换为集合提高查询效率
+            existing_contents_set = set(existing_contents)
+            # 找出和数据库重复的内容
+            db_duplicates = [
+                content for content in contents if content in existing_contents_set
+            ]
+            result["db_duplicates"] = db_duplicates
+
+            # 过滤出数据库中不存在的内容
+            non_duplicate_items = [
+                item
+                for item in unique_items
+                if item.content not in existing_contents_set
+            ]
+        else:
+            non_duplicate_items = []
+
+        # 第二步：处理每个不重复的句子对象
+        for item in non_duplicate_items:
             # 设置权限相关字段
             item.is_disabled = False if is_superuser else True
             # 初始化点赞数
@@ -198,14 +207,18 @@ def create_sentence(
                 **sentence_dict, sentence_user_id=sentence_user_id
             )
             sentence_objects.append(sentence_db)
+
         # 第三步：批量添加并提交
-        session.add_all(sentence_objects)
-        session.commit()
-        # 刷新所有对象以获取数据库生成的字段（如id）
-        for obj in sentence_objects:
-            session.refresh(obj)
-        # 根据输入类型返回对应结果
-        return sentence_objects[0] if is_single else sentence_objects
+        if sentence_objects:
+            session.add_all(sentence_objects)
+            session.commit()
+            # 刷新所有对象以获取数据库生成的字段（如id）
+            for obj in sentence_objects:
+                session.refresh(obj)
+            result["success_count"] = len(sentence_objects)
+
+        # 返回处理结果
+        return result
     except HTTPException:
         # 主动抛出的HTTP异常直接向上传递
         raise
