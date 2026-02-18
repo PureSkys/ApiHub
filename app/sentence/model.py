@@ -12,6 +12,7 @@ class SentenceCategoryModel(SQLModel, table=True):
         default_factory=uuid.uuid7, primary_key=True, index=True, unique=True
     )
     category: str = Field(description="句子分类", unique=True, index=True)
+    description: str | None = Field(description="句子分类描述", default=None)
     created_at: datetime = Field(sa_column=Column(DateTime, default=func.now()))
     updated_at: datetime = Field(
         sa_column=Column(DateTime, default=func.now(), onupdate=func.now())
@@ -61,6 +62,7 @@ class SentenceUserConfigModel(SQLModel, table=True):
 # 分类创建/更新入参模型
 class CategoryUpdateAndCreate(SQLModel):
     category: str
+    description: str | None = None
 
     # 清洗category字段方法
     @field_validator("category")
@@ -75,6 +77,7 @@ class CategoryUpdateAndCreate(SQLModel):
 class CategoryResponse(SQLModel):
     id: uuid.UUID
     category: str
+    description: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -92,13 +95,14 @@ class SentenceUpdateAndCreate(SQLModel):
 # 句子响应模型（包含分类信息）
 class SentenceResponse(SQLModel):
     id: uuid.UUID
+    is_disabled: bool
     content: str
     from_source: str | None = None
     from_who: str | None = None
     likes: int
     created_at: datetime
     updated_at: datetime
-    category: CategoryResponse
+    category_id: uuid.UUID
 
 
 from app.user.model import UserModel

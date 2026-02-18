@@ -42,6 +42,7 @@ def delete_sentence_category_route(
     return result
 
 
+# todo更新时重复项检测要避开自身，因为有时修改的是分类描述而不是分类名称
 @sentence_route.put(
     "/category/{_id}",
     summary="更新分类路由",

@@ -198,7 +198,8 @@ def create_sentence(
         # 第二步：处理每个不重复的句子对象
         for item in non_duplicate_items:
             # 设置权限相关字段
-            item.is_disabled = False if is_superuser else True
+            if not is_superuser:
+                item.is_disabled = True
             # 初始化点赞数
             item.likes = 0
             # 转换为字典并创建数据库模型对象
