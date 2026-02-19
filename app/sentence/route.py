@@ -42,7 +42,6 @@ def delete_sentence_category_route(
     return result
 
 
-# todo更新时重复项检测要避开自身，因为有时修改的是分类描述而不是分类名称
 @sentence_route.put(
     "/category/{_id}",
     summary="更新分类路由",
@@ -126,3 +125,19 @@ def get_sentence_route(
 ):
     sentences = server.get_sentence(session, category_id, limit)
     return sentences
+
+
+@sentence_route.get(
+    "/admin/paginated",
+    summary="分页查询句子路由（后台管理）",
+    status_code=status.HTTP_200_OK,
+)
+def get_sentence_paginated_route(
+    session: SessionDep,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    category_id: str = Query(None, description="分类ID，传入'all'或不传入则查询所有分类"),
+    token: str = Depends(oauth2_scheme),
+):
+    result = server.get_sentence_paginated(session, page, page_size, token, category_id)
+    return result

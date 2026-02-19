@@ -96,11 +96,18 @@ def update_sentence_category(
             category_db = session.get(SentenceCategoryModel, _id)
             if not category_db:
                 raise HTTPException(status_code=404, detail="Category not found")
-            if category_db.category == category_update.category:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"分类「{category_db.category}」已存在，无法重复创建！",
+            # 只有当分类名发生变化时，才检查是否与其他分类重复（不包含自身）
+            if category_db.category != category_update.category:
+                statement = select(SentenceCategoryModel).where(
+                    SentenceCategoryModel.category == category_update.category,
+                    SentenceCategoryModel.id != _id,  # 排除自身
                 )
+                existing_category = session.exec(statement).first()
+                if existing_category:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"分类「{category_update.category}」已存在，无法重复创建！",
+                    )
             category_dict = category_update.model_dump(exclude_unset=True)
             category_db.sqlmodel_update(category_dict)
             session.commit()
@@ -291,7 +298,7 @@ def update_sentence(
         raise HTTPException(status_code=500, detail="更新句子失败，请联系管理员！")
 
 
-# 获取句子的方法
+# 获取随机句子的方法
 def get_sentence(session: Session, category_id: str, limit: int):
     try:
         if category_id == "all":
@@ -311,3 +318,51 @@ def get_sentence(session: Session, category_id: str, limit: int):
         session.rollback()
         print(f"查询句子失败：{str(e)}")
         raise HTTPException(status_code=500, detail="查询句子失败，请联系管理员！")
+
+
+# 分页查询句子的方法
+def get_sentence_paginated(session: Session, page: int, page_size: int, token: str, category_id: str = None):
+    try:
+        # 获取用户权限信息
+        (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = get_basic_info(session, token)
+        
+        # 构建查询语句
+        if sentence_user_is_superuser or user_is_superuser:
+            # 超级管理员可以查看所有句子
+            statement = select(SentenceContentModel)
+        else:
+            # 普通用户只能查看自己的句子
+            statement = select(SentenceContentModel).where(
+                SentenceContentModel.sentence_user_id == sentence_user_id
+            )
+        
+        # 如果提供了分类id，则添加分类过滤
+        if category_id and category_id != "all":
+            statement = statement.where(SentenceContentModel.category_id == category_id)
+        
+        # 计算总条数
+        total_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(total_statement).one()
+        
+        # 计算偏移量并添加排序
+        offset = (page - 1) * page_size
+        statement = statement.order_by(SentenceContentModel.created_at.desc()).offset(offset).limit(page_size)
+        
+        # 执行查询
+        sentences = session.exec(statement).all()
+        
+        # 计算总页数
+        total_pages = (total + page_size - 1) // page_size
+        
+        # 返回分页结果
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "items": sentences
+        }
+    except Exception as e:
+        session.rollback()
+        print(f"分页查询句子失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="分页查询句子失败，请联系管理员！")

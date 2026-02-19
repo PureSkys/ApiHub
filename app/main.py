@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.user.route import auth_router
 from app.core.database import init_db, close_db
 from app.sentence.route import sentence_route
+from app.core.health import health_router
 
 
 @asynccontextmanager
@@ -17,6 +18,7 @@ app = FastAPI(
     title="ApiHub",
     description="我的API聚合中心",
     lifespan=lifespan,
+    version="1.0.0",
 )
 # 配置跨域中间件
 # 允许所有跨域的核心配置
@@ -31,3 +33,4 @@ app.add_middleware(
 )
 app.include_router(sentence_route, prefix="/sentence", tags=["Sentence"])
 app.include_router(auth_router, prefix="/user", tags=["Auth"])
+app.include_router(health_router, prefix="/health", tags=["Health"])
