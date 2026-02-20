@@ -129,15 +129,17 @@ def get_sentence_route(
 
 @sentence_route.get(
     "/admin/paginated",
-    summary="分页查询句子路由（后台管理）",
+    summary="分页查询句子路由（支持筛选）",
     status_code=status.HTTP_200_OK,
 )
 def get_sentence_paginated_route(
     session: SessionDep,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    search: str = Query(None, description="模糊搜索句子内容"),
     category_id: str = Query(None, description="分类ID，传入'all'或不传入则查询所有分类"),
+    is_disabled: bool = Query(None, description="句子状态，true为禁用，false为启用"),
     token: str = Depends(oauth2_scheme),
 ):
-    result = server.get_sentence_paginated(session, page, page_size, token, category_id)
+    result = server.get_sentence_paginated(session, page, page_size, token, search, category_id, is_disabled)
     return result

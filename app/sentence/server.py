@@ -320,8 +320,9 @@ def get_sentence(session: Session, category_id: str, limit: int):
         raise HTTPException(status_code=500, detail="查询句子失败，请联系管理员！")
 
 
-# 分页查询句子的方法
-def get_sentence_paginated(session: Session, page: int, page_size: int, token: str, category_id: str = None):
+# 分页查询句子的方法（支持筛选）
+def get_sentence_paginated(session: Session, page: int, page_size: int, token: str, 
+                           search: str = None, category_id: str = None, is_disabled: bool = None):
     try:
         # 获取用户权限信息
         (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = get_basic_info(session, token)
@@ -336,9 +337,17 @@ def get_sentence_paginated(session: Session, page: int, page_size: int, token: s
                 SentenceContentModel.sentence_user_id == sentence_user_id
             )
         
-        # 如果提供了分类id，则添加分类过滤
+        # 添加搜索条件
+        if search:
+            statement = statement.where(SentenceContentModel.content.ilike(f"%{search}%"))
+        
+        # 添加分类过滤
         if category_id and category_id != "all":
             statement = statement.where(SentenceContentModel.category_id == category_id)
+        
+        # 添加状态过滤
+        if is_disabled is not None:
+            statement = statement.where(SentenceContentModel.is_disabled == is_disabled)
         
         # 计算总条数
         total_statement = select(func.count()).select_from(statement.subquery())
