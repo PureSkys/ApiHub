@@ -1,6 +1,7 @@
 import uuid
 from typing import Annotated
 from fastapi import APIRouter, status, Query, Depends, HTTPException
+from pydantic import BaseModel
 from sqlmodel import select
 from app.sentence.model import (
     SentenceResponse,
@@ -142,4 +143,56 @@ def get_sentence_paginated_route(
     token: str = Depends(oauth2_scheme),
 ):
     result = server.get_sentence_paginated(session, page, page_size, token, search, category_id, is_disabled)
+    return result
+
+
+# 批量更新句子状态请求模型
+class BatchUpdateStatusRequest(BaseModel):
+    ids: list[uuid.UUID]
+    is_disabled: bool
+
+
+@sentence_route.post(
+    "/admin/batch/status",
+    summary="批量更新句子状态路由",
+    status_code=status.HTTP_200_OK,
+)
+def batch_update_sentence_status_route(
+    session: SessionDep,
+    request: BatchUpdateStatusRequest,
+    token: str = Depends(oauth2_scheme),
+):
+    result = server.batch_update_sentence_status(session, request.ids, request.is_disabled, token)
+    return result
+
+
+# 批量删除句子请求模型
+class BatchDeleteRequest(BaseModel):
+    ids: list[uuid.UUID]
+
+
+@sentence_route.post(
+    "/admin/batch/delete",
+    summary="批量删除句子路由",
+    status_code=status.HTTP_200_OK,
+)
+def batch_delete_sentences_route(
+    session: SessionDep,
+    request: BatchDeleteRequest,
+    token: str = Depends(oauth2_scheme),
+):
+    result = server.batch_delete_sentences(session, request.ids, token)
+    return result
+
+
+@sentence_route.get(
+    "/admin/stats",
+    summary="获取应用统计信息路由",
+    status_code=status.HTTP_200_OK,
+)
+def get_sentence_stats_route(
+    session: SessionDep,
+    token: str = Depends(oauth2_scheme),
+):
+    result = server.get_sentence_stats(session, token)
     return result

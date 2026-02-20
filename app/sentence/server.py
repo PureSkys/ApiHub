@@ -375,3 +375,139 @@ def get_sentence_paginated(session: Session, page: int, page_size: int, token: s
         session.rollback()
         print(f"分页查询句子失败：{str(e)}")
         raise HTTPException(status_code=500, detail="分页查询句子失败，请联系管理员！")
+
+
+# 辅助函数：获取批量句子（根据权限过滤）
+def _get_batch_sentences(session: Session, ids: list[uuid.UUID], token: str):
+    """获取批量句子，根据用户权限进行过滤"""
+    (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = get_basic_info(session, token)
+    
+    # 构建查询语句
+    if sentence_user_is_superuser or user_is_superuser:
+        # 超级管理员可以操作所有句子
+        statement = select(SentenceContentModel).where(SentenceContentModel.id.in_(ids))
+    else:
+        # 普通用户只能操作自己的句子
+        statement = select(SentenceContentModel).where(
+            SentenceContentModel.id.in_(ids),
+            SentenceContentModel.sentence_user_id == sentence_user_id
+        )
+    
+    # 执行查询
+    sentences = session.exec(statement).all()
+    
+    if not sentences:
+        raise HTTPException(status_code=404, detail="未找到可操作的句子")
+    
+    return sentences
+
+
+# 批量更改句子状态的方法
+def batch_update_sentence_status(session: Session, ids: list[uuid.UUID], is_disabled: bool, token: str):
+    try:
+        # 获取可操作的句子
+        sentences = _get_batch_sentences(session, ids, token)
+        
+        # 批量更新状态
+        for sentence in sentences:
+            sentence.is_disabled = is_disabled
+        
+        session.commit()
+        
+        return {
+            "msg": "批量更新句子状态成功",
+            "updated_count": len(sentences)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        print(f"批量更新句子状态失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="批量更新句子状态失败，请联系管理员！")
+
+
+# 批量删除句子的方法
+def batch_delete_sentences(session: Session, ids: list[uuid.UUID], token: str):
+    try:
+        # 获取可操作的句子
+        sentences = _get_batch_sentences(session, ids, token)
+        
+        # 批量删除
+        for sentence in sentences:
+            session.delete(sentence)
+        
+        session.commit()
+        
+        return {
+            "msg": "批量删除句子成功",
+            "deleted_count": len(sentences)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        print(f"批量删除句子失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="批量删除句子失败，请联系管理员！")
+
+
+# 获取应用统计信息的方法
+def get_sentence_stats(session: Session, token: str):
+    try:
+        # 获取用户权限信息
+        (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = get_basic_info(session, token)
+        
+        # 构建基础查询语句
+        if sentence_user_is_superuser or user_is_superuser:
+            # 超级管理员可以查看所有句子
+            base_statement = select(SentenceContentModel)
+        else:
+            # 普通用户只能查看自己的句子
+            base_statement = select(SentenceContentModel).where(
+                SentenceContentModel.sentence_user_id == sentence_user_id
+            )
+        
+        # 获取所有分类
+        categories = session.exec(select(SentenceCategoryModel)).all()
+        
+        # 统计信息
+        stats = {
+            "total_sentences": 0,
+            "enabled_sentences": 0,
+            "disabled_sentences": 0,
+            "categories": []
+        }
+        
+        # 统计每个分类的信息
+        for category in categories:
+            # 构建分类查询语句
+            category_statement = base_statement.where(
+                SentenceContentModel.category_id == category.id
+            )
+            
+            # 获取分类下的所有句子
+            category_sentences = session.exec(category_statement).all()
+            category_total = len(category_sentences)
+            
+            # 统计启用和禁用数量
+            category_enabled = sum(1 for s in category_sentences if not s.is_disabled)
+            category_disabled = sum(1 for s in category_sentences if s.is_disabled)
+            
+            # 添加到统计信息
+            stats["categories"].append({
+                "id": category.id,
+                "name": category.category,
+                "total": category_total,
+                "enabled": category_enabled,
+                "disabled": category_disabled
+            })
+            
+            # 更新总统计
+            stats["total_sentences"] += category_total
+            stats["enabled_sentences"] += category_enabled
+            stats["disabled_sentences"] += category_disabled
+        
+        return stats
+    except Exception as e:
+        session.rollback()
+        print(f"获取统计信息失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="获取统计信息失败，请联系管理员！")
