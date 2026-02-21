@@ -1,19 +1,16 @@
 import uuid
 from typing import Annotated
-from fastapi import APIRouter, status, Query, Depends, HTTPException
+from fastapi import APIRouter, status, Query, Depends
 from pydantic import BaseModel
-from sqlmodel import select
 from app.sentence.model import (
     SentenceResponse,
     SentenceUpdateAndCreate,
     CategoryResponse,
     CategoryUpdateAndCreate,
-    SentenceContentModel,
 )
 from app.core.database import SessionDep
 import app.sentence.server as server
 from app.user.route import oauth2_scheme
-from app.user import server as user_server
 
 sentence_route = APIRouter()
 
@@ -72,7 +69,7 @@ def get_sentence_category_route(session: SessionDep):
 
 @sentence_route.post(
     "/",
-    summary="创建句子路由",
+    summary="创建句子路由（批量和单个都行）",
     description="可以通过数组批量创建",
     status_code=status.HTTP_201_CREATED,
 )
@@ -87,7 +84,7 @@ def create_sentence_route(
 
 @sentence_route.delete(
     "/{_id}",
-    summary="删除句子路由",
+    summary="单个删除句子路由",
     status_code=status.HTTP_200_OK,
 )
 def delete_sentence_route(
@@ -99,7 +96,7 @@ def delete_sentence_route(
 
 @sentence_route.put(
     "/{_id}",
-    summary="更新句子路由",
+    summary="单个更新句子路由",
     response_model=SentenceResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -115,7 +112,7 @@ def update_sentence_route(
 
 @sentence_route.get(
     "/{category_id}",
-    summary="查询句子路由",
+    summary="随机句子路由",
     response_model=list[SentenceResponse],
     status_code=status.HTTP_200_OK,
 )
@@ -138,11 +135,15 @@ def get_sentence_paginated_route(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     search: str = Query(None, description="模糊搜索句子内容"),
-    category_id: str = Query(None, description="分类ID，传入'all'或不传入则查询所有分类"),
+    category_id: str = Query(
+        None, description="分类ID，传入'all'或不传入则查询所有分类"
+    ),
     is_disabled: bool = Query(None, description="句子状态，true为禁用，false为启用"),
     token: str = Depends(oauth2_scheme),
 ):
-    result = server.get_sentence_paginated(session, page, page_size, token, search, category_id, is_disabled)
+    result = server.get_sentence_paginated(
+        session, page, page_size, token, search, category_id, is_disabled
+    )
     return result
 
 
@@ -162,7 +163,9 @@ def batch_update_sentence_status_route(
     request: BatchUpdateStatusRequest,
     token: str = Depends(oauth2_scheme),
 ):
-    result = server.batch_update_sentence_status(session, request.ids, request.is_disabled, token)
+    result = server.batch_update_sentence_status(
+        session, request.ids, request.is_disabled, token
+    )
     return result
 
 
