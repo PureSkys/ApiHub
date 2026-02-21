@@ -18,6 +18,7 @@ master:
             auth_type: https
             username: ${GIT_USERNAME}
             password: ${GIT_ACCESS_TOKEN}
+    - name: "build for docker"
     - services:
         - docker #声明后，流水线内可以直接使用docker命令
       stages:
