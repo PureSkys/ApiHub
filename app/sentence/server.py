@@ -323,12 +323,21 @@ def get_sentence(session: Session, category_id: str, limit: int):
 
 
 # 分页查询句子的方法（支持筛选）
-def get_sentence_paginated(session: Session, page: int, page_size: int, token: str, 
-                           search: str = None, category_id: str = None, is_disabled: bool = None):
+def get_sentence_paginated(
+    session: Session,
+    page: int,
+    page_size: int,
+    token: str,
+    search: str = None,
+    category_id: str = None,
+    is_disabled: bool = None,
+):
     try:
         # 获取用户权限信息
-        (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = get_basic_info(session, token)
-        
+        (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = (
+            get_basic_info(session, token)
+        )
+
         # 构建查询语句
         if sentence_user_is_superuser or user_is_superuser:
             # 超级管理员可以查看所有句子
@@ -338,40 +347,46 @@ def get_sentence_paginated(session: Session, page: int, page_size: int, token: s
             statement = select(SentenceContentModel).where(
                 SentenceContentModel.sentence_user_id == sentence_user_id
             )
-        
+
         # 添加搜索条件
         if search:
-            statement = statement.where(SentenceContentModel.content.ilike(f"%{search}%"))
-        
+            statement = statement.where(
+                SentenceContentModel.content.ilike(f"%{search}%")
+            )
+
         # 添加分类过滤
         if category_id and category_id != "all":
             statement = statement.where(SentenceContentModel.category_id == category_id)
-        
+
         # 添加状态过滤
         if is_disabled is not None:
             statement = statement.where(SentenceContentModel.is_disabled == is_disabled)
-        
+
         # 计算总条数
         total_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(total_statement).one()
-        
+
         # 计算偏移量并添加排序
         offset = (page - 1) * page_size
-        statement = statement.order_by(SentenceContentModel.created_at.desc()).offset(offset).limit(page_size)
-        
+        statement = (
+            statement.order_by(SentenceContentModel.created_at.desc())
+            .offset(offset)
+            .limit(page_size)
+        )
+
         # 执行查询
         sentences = session.exec(statement).all()
-        
+
         # 计算总页数
         total_pages = (total + page_size - 1) // page_size
-        
+
         # 返回分页结果
         return {
             "total": total,
             "page": page,
             "page_size": page_size,
             "total_pages": total_pages,
-            "items": sentences
+            "items": sentences,
         }
     except Exception as e:
         session.rollback()
@@ -382,8 +397,10 @@ def get_sentence_paginated(session: Session, page: int, page_size: int, token: s
 # 辅助函数：获取批量句子（根据权限过滤）
 def _get_batch_sentences(session: Session, ids: list[uuid.UUID], token: str):
     """获取批量句子，根据用户权限进行过滤"""
-    (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = get_basic_info(session, token)
-    
+    (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = (
+        get_basic_info(session, token)
+    )
+
     # 构建查询语句
     if sentence_user_is_superuser or user_is_superuser:
         # 超级管理员可以操作所有句子
@@ -392,40 +409,41 @@ def _get_batch_sentences(session: Session, ids: list[uuid.UUID], token: str):
         # 普通用户只能操作自己的句子
         statement = select(SentenceContentModel).where(
             SentenceContentModel.id.in_(ids),
-            SentenceContentModel.sentence_user_id == sentence_user_id
+            SentenceContentModel.sentence_user_id == sentence_user_id,
         )
-    
+
     # 执行查询
     sentences = session.exec(statement).all()
-    
+
     if not sentences:
         raise HTTPException(status_code=404, detail="未找到可操作的句子")
-    
+
     return sentences
 
 
 # 批量更改句子状态的方法
-def batch_update_sentence_status(session: Session, ids: list[uuid.UUID], is_disabled: bool, token: str):
+def batch_update_sentence_status(
+    session: Session, ids: list[uuid.UUID], is_disabled: bool, token: str
+):
     try:
         # 获取可操作的句子
         sentences = _get_batch_sentences(session, ids, token)
-        
+
         # 批量更新状态
         for sentence in sentences:
             sentence.is_disabled = is_disabled
-        
+
         session.commit()
-        
-        return {
-            "msg": "批量更新句子状态成功",
-            "updated_count": len(sentences)
-        }
+
+        return {"msg": "批量更新句子状态成功", "updated_count": len(sentences)}
     except HTTPException:
         raise
     except Exception as e:
         session.rollback()
         print(f"批量更新句子状态失败：{str(e)}")
-        raise HTTPException(status_code=500, detail="批量更新句子状态失败，请联系管理员！")
+        raise HTTPException(
+            status_code=500, detail="批量更新句子状态失败，请联系管理员！"
+        )
 
 
 # 批量删除句子的方法
@@ -433,17 +451,14 @@ def batch_delete_sentences(session: Session, ids: list[uuid.UUID], token: str):
     try:
         # 获取可操作的句子
         sentences = _get_batch_sentences(session, ids, token)
-        
+
         # 批量删除
         for sentence in sentences:
             session.delete(sentence)
-        
+
         session.commit()
-        
-        return {
-            "msg": "批量删除句子成功",
-            "deleted_count": len(sentences)
-        }
+
+        return {"msg": "批量删除句子成功", "deleted_count": len(sentences)}
     except HTTPException:
         raise
     except Exception as e:
@@ -456,8 +471,10 @@ def batch_delete_sentences(session: Session, ids: list[uuid.UUID], token: str):
 def get_sentence_stats(session: Session, token: str):
     try:
         # 获取用户权限信息
-        (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = get_basic_info(session, token)
-        
+        (sentence_user_is_superuser, user_is_superuser, sentence_user_id, *_) = (
+            get_basic_info(session, token)
+        )
+
         # 构建基础查询语句
         if sentence_user_is_superuser or user_is_superuser:
             # 超级管理员可以查看所有句子
@@ -467,47 +484,49 @@ def get_sentence_stats(session: Session, token: str):
             base_statement = select(SentenceContentModel).where(
                 SentenceContentModel.sentence_user_id == sentence_user_id
             )
-        
+
         # 获取所有分类
         categories = session.exec(select(SentenceCategoryModel)).all()
-        
+
         # 统计信息
         stats = {
             "total_sentences": 0,
             "enabled_sentences": 0,
             "disabled_sentences": 0,
-            "categories": []
+            "categories": [],
         }
-        
+
         # 统计每个分类的信息
         for category in categories:
             # 构建分类查询语句
             category_statement = base_statement.where(
                 SentenceContentModel.category_id == category.id
             )
-            
+
             # 获取分类下的所有句子
             category_sentences = session.exec(category_statement).all()
             category_total = len(category_sentences)
-            
+
             # 统计启用和禁用数量
             category_enabled = sum(1 for s in category_sentences if not s.is_disabled)
             category_disabled = sum(1 for s in category_sentences if s.is_disabled)
-            
+
             # 添加到统计信息
-            stats["categories"].append({
-                "id": category.id,
-                "name": category.category,
-                "total": category_total,
-                "enabled": category_enabled,
-                "disabled": category_disabled
-            })
-            
+            stats["categories"].append(
+                {
+                    "id": category.id,
+                    "name": category.category,
+                    "total": category_total,
+                    "enabled": category_enabled,
+                    "disabled": category_disabled,
+                }
+            )
+
             # 更新总统计
             stats["total_sentences"] += category_total
             stats["enabled_sentences"] += category_enabled
             stats["disabled_sentences"] += category_disabled
-        
+
         return stats
     except Exception as e:
         session.rollback()
@@ -522,42 +541,36 @@ def like_sentence(session: Session, sentence_id: uuid.UUID, ip_address: str):
         sentence = session.get(SentenceContentModel, sentence_id)
         if not sentence:
             raise HTTPException(status_code=404, detail="句子不存在")
-        
+
         # 检查句子是否启用
         if sentence.is_disabled:
             raise HTTPException(status_code=403, detail="句子已禁用，无法点赞")
-        
+
         # 获取今天的开始时间
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        
+
         # 检查该IP今天是否已经对该句子点过赞
         existing_like = session.exec(
             select(SentenceLikeModel).where(
                 SentenceLikeModel.sentence_id == sentence_id,
                 SentenceLikeModel.ip_address == ip_address,
-                SentenceLikeModel.created_at >= today
+                SentenceLikeModel.created_at >= today,
             )
         ).first()
-        
+
         if existing_like:
             raise HTTPException(status_code=400, detail="今天已经对该句子点过赞了")
-        
+
         # 创建点赞记录
-        like = SentenceLikeModel(
-            sentence_id=sentence_id,
-            ip_address=ip_address
-        )
+        like = SentenceLikeModel(sentence_id=sentence_id, ip_address=ip_address)
         session.add(like)
-        
+
         # 增加句子的点赞数
         sentence.likes += 1
-        
+
         session.commit()
-        
-        return {
-            "msg": "点赞成功",
-            "likes": sentence.likes
-        }
+
+        return {"msg": "点赞成功", "likes": sentence.likes}
     except HTTPException:
         raise
     except Exception as e:
@@ -573,38 +586,56 @@ def unlike_sentence(session: Session, sentence_id: uuid.UUID, ip_address: str):
         sentence = session.get(SentenceContentModel, sentence_id)
         if not sentence:
             raise HTTPException(status_code=404, detail="句子不存在")
-        
+
         # 获取今天的开始时间
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        
+
         # 查找该IP今天对该句子的点赞记录
         existing_like = session.exec(
             select(SentenceLikeModel).where(
                 SentenceLikeModel.sentence_id == sentence_id,
                 SentenceLikeModel.ip_address == ip_address,
-                SentenceLikeModel.created_at >= today
+                SentenceLikeModel.created_at >= today,
             )
         ).first()
-        
+
         if not existing_like:
             raise HTTPException(status_code=400, detail="今天没有对该句子点过赞")
-        
+
         # 删除点赞记录
         session.delete(existing_like)
-        
+
         # 减少句子的点赞数
         if sentence.likes > 0:
             sentence.likes -= 1
-        
+
         session.commit()
-        
-        return {
-            "msg": "取消点赞成功",
-            "likes": sentence.likes
-        }
+
+        return {"msg": "取消点赞成功", "likes": sentence.likes}
     except HTTPException:
         raise
     except Exception as e:
         session.rollback()
         print(f"取消点赞失败：{str(e)}")
         raise HTTPException(status_code=500, detail="取消点赞失败，请联系管理员！")
+
+
+# 通过UUID数组获取句子的方法
+def get_sentences_by_ids(session: Session, ids: list[uuid.UUID]):
+    try:
+        # 构建查询语句，只查询启用的句子
+        statement = select(SentenceContentModel).where(
+            SentenceContentModel.id.in_(ids),
+            SentenceContentModel.is_disabled == False,  # noqa: E712
+        )
+
+        # 执行查询
+        sentences = session.exec(statement).all()
+
+        return sentences
+    except Exception as e:
+        session.rollback()
+        print(f"通过ID获取句子失败：{str(e)}")
+        raise HTTPException(
+            status_code=500, detail="通过ID获取句子失败，请联系管理员！"
+        )

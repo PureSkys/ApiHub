@@ -232,3 +232,22 @@ def unlike_sentence_route(
     client_ip = request.client.host
     result = server.unlike_sentence(session, sentence_id, client_ip)
     return result
+
+
+# 通过UUID数组获取句子的请求模型
+class GetSentencesByIdsRequest(BaseModel):
+    ids: list[uuid.UUID]
+
+
+@sentence_route.post(
+    "/by-ids",
+    summary="通过UUID数组获取句子路由",
+    response_model=list[SentenceResponse],
+    status_code=status.HTTP_200_OK,
+)
+def get_sentences_by_ids_route(
+    session: SessionDep,
+    request: GetSentencesByIdsRequest,
+):
+    sentences = server.get_sentences_by_ids(session, request.ids)
+    return sentences
