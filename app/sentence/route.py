@@ -1,7 +1,8 @@
 import uuid
 from typing import Annotated
-from fastapi import APIRouter, status, Query, Depends
+from fastapi import APIRouter, status, Query, Depends, Request
 from pydantic import BaseModel
+
 from app.sentence.model import (
     SentenceResponse,
     SentenceUpdateAndCreate,
@@ -198,4 +199,36 @@ def get_sentence_stats_route(
     token: str = Depends(oauth2_scheme),
 ):
     result = server.get_sentence_stats(session, token)
+    return result
+
+
+@sentence_route.post(
+    "/like/{sentence_id}",
+    summary="点赞路由",
+    status_code=status.HTTP_200_OK,
+)
+def like_sentence_route(
+    session: SessionDep,
+    sentence_id: uuid.UUID,
+    request: Request,
+):
+    # 获取用户IP地址
+    client_ip = request.client.host
+    result = server.like_sentence(session, sentence_id, client_ip)
+    return result
+
+
+@sentence_route.post(
+    "/unlike/{sentence_id}",
+    summary="取消点赞路由",
+    status_code=status.HTTP_200_OK,
+)
+def unlike_sentence_route(
+    session: SessionDep,
+    sentence_id: uuid.UUID,
+    request: Request,
+):
+    # 获取用户IP地址
+    client_ip = request.client.host
+    result = server.unlike_sentence(session, sentence_id, client_ip)
     return result

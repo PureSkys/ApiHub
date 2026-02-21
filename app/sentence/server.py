@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select, func
@@ -7,6 +8,7 @@ from app.sentence.model import (
     CategoryUpdateAndCreate,
     SentenceCategoryModel,
     SentenceContentModel,
+    SentenceLikeModel,
 )
 from app.user import server as user_server
 
@@ -511,3 +513,98 @@ def get_sentence_stats(session: Session, token: str):
         session.rollback()
         print(f"获取统计信息失败：{str(e)}")
         raise HTTPException(status_code=500, detail="获取统计信息失败，请联系管理员！")
+
+
+# 点赞方法
+def like_sentence(session: Session, sentence_id: uuid.UUID, ip_address: str):
+    try:
+        # 检查句子是否存在
+        sentence = session.get(SentenceContentModel, sentence_id)
+        if not sentence:
+            raise HTTPException(status_code=404, detail="句子不存在")
+        
+        # 检查句子是否启用
+        if sentence.is_disabled:
+            raise HTTPException(status_code=403, detail="句子已禁用，无法点赞")
+        
+        # 获取今天的开始时间
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # 检查该IP今天是否已经对该句子点过赞
+        existing_like = session.exec(
+            select(SentenceLikeModel).where(
+                SentenceLikeModel.sentence_id == sentence_id,
+                SentenceLikeModel.ip_address == ip_address,
+                SentenceLikeModel.created_at >= today
+            )
+        ).first()
+        
+        if existing_like:
+            raise HTTPException(status_code=400, detail="今天已经对该句子点过赞了")
+        
+        # 创建点赞记录
+        like = SentenceLikeModel(
+            sentence_id=sentence_id,
+            ip_address=ip_address
+        )
+        session.add(like)
+        
+        # 增加句子的点赞数
+        sentence.likes += 1
+        
+        session.commit()
+        
+        return {
+            "msg": "点赞成功",
+            "likes": sentence.likes
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        print(f"点赞失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="点赞失败，请联系管理员！")
+
+
+# 取消点赞方法
+def unlike_sentence(session: Session, sentence_id: uuid.UUID, ip_address: str):
+    try:
+        # 检查句子是否存在
+        sentence = session.get(SentenceContentModel, sentence_id)
+        if not sentence:
+            raise HTTPException(status_code=404, detail="句子不存在")
+        
+        # 获取今天的开始时间
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # 查找该IP今天对该句子的点赞记录
+        existing_like = session.exec(
+            select(SentenceLikeModel).where(
+                SentenceLikeModel.sentence_id == sentence_id,
+                SentenceLikeModel.ip_address == ip_address,
+                SentenceLikeModel.created_at >= today
+            )
+        ).first()
+        
+        if not existing_like:
+            raise HTTPException(status_code=400, detail="今天没有对该句子点过赞")
+        
+        # 删除点赞记录
+        session.delete(existing_like)
+        
+        # 减少句子的点赞数
+        if sentence.likes > 0:
+            sentence.likes -= 1
+        
+        session.commit()
+        
+        return {
+            "msg": "取消点赞成功",
+            "likes": sentence.likes
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        print(f"取消点赞失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="取消点赞失败，请联系管理员！")

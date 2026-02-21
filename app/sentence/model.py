@@ -92,6 +92,17 @@ class SentenceUpdateAndCreate(SQLModel):
     likes: int | None = 0
 
 
+# 数据库句子点赞记录表模型
+class SentenceLikeModel(SQLModel, table=True):
+    __tablename__ = "sentence_like"
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid7, primary_key=True, index=True, unique=True
+    )
+    sentence_id: uuid.UUID = Field(foreign_key="sentence_content.id", index=True)
+    ip_address: str = Field(description="用户IP地址", index=True)
+    created_at: datetime = Field(sa_column=Column(DateTime, default=func.now()))
+
+
 # 句子响应模型（包含分类信息）
 class SentenceResponse(SQLModel):
     id: uuid.UUID
