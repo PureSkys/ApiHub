@@ -18,3 +18,18 @@ master:
             auth_type: https
             username: ${GIT_USERNAME}
             password: ${GIT_ACCESS_TOKEN}
+    - name: "build for docker"
+      stages:
+        - services:
+            - docker #声明后，流水线内可以直接使用docker命令
+          stages:
+            - name: set docker tag
+              script: echo -n "${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}:latest"
+              exports:
+                info: IMAGE_TAG
+
+            - name: docker build
+              script: docker build -t $IMAGE_TAG .
+
+            - name: push image
+              script: docker push $IMAGE_TAG
