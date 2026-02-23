@@ -1,6 +1,11 @@
 import uuid
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, EmailStr
 from sqlmodel import SQLModel, Field, Relationship
+
+if TYPE_CHECKING:
+    from app.sentence.model import SentenceUserConfigModel
 
 
 # 用户数据模型
@@ -46,6 +51,3 @@ class UserCreateAndUpdate(SQLModel):
     email: EmailStr
     hashed_password: str
     nickname: str | None = Field(default=None)
-
-
-from app.sentence.model import SentenceUserConfigModel

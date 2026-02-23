@@ -1,4 +1,4 @@
-from sqlmodel import create_engine, Session, select
+from sqlmodel import create_engine, Session, select, SQLModel
 
 from app.user.model import UserModel, UserCreateAndUpdate
 from app.user.server import create_user
@@ -29,7 +29,7 @@ SessionDep = Annotated[Session, Depends(_get_session)]
 def init_db():
     try:
         with Session(engine) as session:
-            # SQLModel.metadata.create_all(engine)  # 开发环境可以使用该行代码初始化数据库
+            SQLModel.metadata.create_all(engine)  # 开发环境可以使用该行代码初始化数据库
 
             statement = select(UserModel)
             users = session.exec(statement).all()

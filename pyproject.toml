@@ -5,14 +5,11 @@ description = "我的API聚合平台，我的所有API由此项目提供"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.18.4",
-    "fastapi[standard]>=0.129.0",
+    "fastapi[standard]>=0.131.0",
     "psycopg[binary]>=3.3.3",
     "pwdlib[argon2]>=0.3.0",
     "pyjwt>=2.11.0",
     "ruff>=0.15.2",
-    "sqlmodel>=0.0.35",
+    "sqlmodel>=0.0.37",
     "uvicorn>=0.41.0",
 ]
-
-[tool.ruff]
-ignore = ["E402"]

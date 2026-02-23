@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Column, DateTime
 from sqlmodel import SQLModel, Field, func, Relationship
 import uuid
 from datetime import datetime
 from pydantic import field_validator
+
+if TYPE_CHECKING:
+    from app.user.model import UserModel
 
 
 # 数据库句子类型表模型
@@ -114,6 +119,3 @@ class SentenceResponse(SQLModel):
     created_at: datetime
     updated_at: datetime
     category_id: uuid.UUID
-
-
-from app.user.model import UserModel
