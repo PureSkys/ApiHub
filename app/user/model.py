@@ -6,6 +6,7 @@ from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
     from app.sentence.model import SentenceUserConfigModel
+    from app.school.model import SchoolAdminModel
 
 
 # 用户数据模型
@@ -22,6 +23,10 @@ class UserModel(SQLModel, table=True):
     is_superuser: bool = Field(description="超级管理员状态", default=False)
     # 下面关联项目内其他应用的模型
     sentence_user_config: "SentenceUserConfigModel" = Relationship(
+        back_populates="user",
+        cascade_delete=True,
+    )
+    school_admin: "SchoolAdminModel" = Relationship(
         back_populates="user",
         cascade_delete=True,
     )

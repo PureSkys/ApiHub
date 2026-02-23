@@ -12,6 +12,8 @@ from app.school.route import (
     exam_router,
     score_router,
     stats_router,
+    admin_router,
+    log_router,
 )
 
 
@@ -48,3 +50,5 @@ app.include_router(student_router, prefix="/school/student", tags=["Student"])
 app.include_router(exam_router, prefix="/school/exam", tags=["Exam"])
 app.include_router(score_router, prefix="/school/score", tags=["Score"])
 app.include_router(stats_router, prefix="/school/stats", tags=["Stats"])
+app.include_router(admin_router, prefix="/school/admin", tags=["SchoolAdmin"])
+app.include_router(log_router, prefix="/school/log", tags=["OperationLog"])

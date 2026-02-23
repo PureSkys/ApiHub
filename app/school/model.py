@@ -5,11 +5,11 @@ from enum import Enum
 from sqlalchemy import Column, DateTime
 from sqlmodel import SQLModel, Field, func, Relationship
 import uuid
-from pydantic import field_validator
+from pydantic import field_validator, EmailStr
 
 
 if TYPE_CHECKING:
-    pass
+    from app.user.model import UserModel
 
 
 class Gender(str, Enum):
@@ -43,6 +43,40 @@ class SchoolModel(SQLModel, table=True):
     exams: list["ExamModel"] = Relationship(
         back_populates="school", cascade_delete=True
     )
+    school_admins: list["SchoolAdminModel"] = Relationship(
+        back_populates="school", cascade_delete=True
+    )
+
+
+class SchoolAdminModel(SQLModel, table=True):
+    __tablename__ = "school_admin"
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid7, primary_key=True, index=True, unique=True
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", unique=True, index=True)
+    school_id: uuid.UUID = Field(foreign_key="school.id", index=True)
+    is_active: bool = Field(description="账户状态", default=True)
+    created_at: datetime = Field(sa_column=Column(DateTime, default=func.now()))
+    updated_at: datetime = Field(
+        sa_column=Column(DateTime, default=func.now(), onupdate=func.now())
+    )
+    user: "UserModel" = Relationship(back_populates="school_admin")
+    school: SchoolModel = Relationship(back_populates="school_admins")
+
+
+class OperationLogModel(SQLModel, table=True):
+    __tablename__ = "operation_log"
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid7, primary_key=True, index=True, unique=True
+    )
+    user_id: uuid.UUID = Field(description="操作用户ID", index=True)
+    user_type: str = Field(description="用户类型", max_length=20)
+    action: str = Field(description="操作类型", max_length=50)
+    resource_type: str = Field(description="资源类型", max_length=50)
+    resource_id: uuid.UUID | None = Field(description="资源ID", default=None)
+    detail: str | None = Field(description="操作详情", default=None, max_length=2000)
+    ip_address: str | None = Field(description="操作IP地址", default=None, max_length=50)
+    created_at: datetime = Field(sa_column=Column(DateTime, default=func.now()))
 
 
 class ClassModel(SQLModel, table=True):
@@ -332,3 +366,55 @@ class StudentScoreTrend(SQLModel):
     chinese: float | None
     math: float | None
     english: float | None
+
+
+class SchoolAdminCreate(SQLModel):
+    email: EmailStr = Field(description="用户邮箱", max_length=255)
+    password: str = Field(description="用户密码", max_length=100)
+    nickname: str | None = Field(description="用户昵称", default=None, max_length=8)
+    school_id: uuid.UUID = Field(description="关联学校ID")
+
+
+class SchoolAdminUpdate(SQLModel):
+    nickname: str | None = Field(default=None, max_length=8)
+    school_id: uuid.UUID | None = None
+    is_active: bool | None = None
+
+
+class SchoolAdminResponse(SQLModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    school_id: uuid.UUID
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class SchoolAdminDetailResponse(SQLModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    school_id: uuid.UUID
+    school_name: str
+    user_email: EmailStr
+    user_nickname: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class OperationLogResponse(SQLModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    user_type: str
+    action: str
+    resource_type: str
+    resource_id: uuid.UUID | None
+    detail: str | None
+    ip_address: str | None
+    created_at: datetime
+
+
+class UserPermissionInfo(SQLModel):
+    user_id: uuid.UUID
+    is_superuser: bool
+    school_ids: list[uuid.UUID]
