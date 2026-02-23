@@ -11,9 +11,13 @@ from app.school.model import (
     ClassModel,
     ClassCreate,
     ClassUpdate,
+    ClassBatchCreate,
+    ClassBatchItem,
     StudentModel,
     StudentCreate,
     StudentUpdate,
+    StudentBatchCreate,
+    StudentBatchItem,
     ExamModel,
     ExamCreate,
     ExamUpdate,
@@ -30,6 +34,7 @@ from app.school.model import (
     OperationLogModel,
     OperationLogResponse,
     UserPermissionInfo,
+    BatchImportResult,
 )
 from app.user.model import UserModel, UserCreateAndUpdate
 from app.user.server import get_current_user, get_password_hash
@@ -305,6 +310,44 @@ def create_class(
         raise HTTPException(status_code=500, detail="创建班级失败，请联系管理员！")
 
 
+def create_classes_batch(
+    session: Session,
+    batch_data: ClassBatchCreate,
+    token: str,
+    ip_address: str | None = None,
+) -> BatchImportResult:
+    perm = check_school_access(session, token, batch_data.school_id)
+    success_count = 0
+    errors = []
+    for idx, class_item in enumerate(batch_data.classes):
+        try:
+            class_db = ClassModel(
+                name=class_item.name,
+                grade=class_item.grade,
+                description=class_item.description,
+                school_id=batch_data.school_id,
+            )
+            session.add(class_db)
+            success_count += 1
+        except Exception as e:
+            errors.append(f"第{idx + 1}条数据「{class_item.name}」创建失败: {str(e)}")
+    session.commit()
+    log_operation(
+        session=session,
+        user_id=perm.user_id,
+        user_type="superuser" if perm.is_superuser else "school_admin",
+        action="batch_create",
+        resource_type="class",
+        detail=f"成功创建 {success_count} 个班级",
+        ip_address=ip_address,
+    )
+    return BatchImportResult(
+        success_count=success_count,
+        fail_count=len(errors),
+        errors=errors,
+    )
+
+
 def get_classes(
     session: Session, token: str, school_id: uuid.UUID | None = None
 ) -> list[ClassModel]:
@@ -468,6 +511,59 @@ def create_student(
         session.rollback()
         print(f"创建学生失败：{str(e)}")
         raise HTTPException(status_code=500, detail="创建学生失败，请联系管理员！")
+
+
+def create_students_batch(
+    session: Session,
+    batch_data: StudentBatchCreate,
+    token: str,
+    ip_address: str | None = None,
+) -> BatchImportResult:
+    class_db = session.get(ClassModel, batch_data.class_id)
+    if not class_db:
+        raise HTTPException(status_code=404, detail="关联的班级不存在")
+    perm = check_school_access(session, token, class_db.school_id)
+    success_count = 0
+    errors = []
+    existing_numbers = set()
+    for idx, student_item in enumerate(batch_data.students):
+        try:
+            if student_item.student_number in existing_numbers:
+                errors.append(f"第{idx + 1}条数据「{student_item.name}」学号「{student_item.student_number}」在本次导入中重复")
+                continue
+            statement = select(StudentModel).where(
+                StudentModel.student_number == student_item.student_number
+            )
+            existing_student = session.exec(statement).first()
+            if existing_student:
+                errors.append(f"第{idx + 1}条数据「{student_item.name}」学号「{student_item.student_number}」已存在")
+                continue
+            student_db = StudentModel(
+                name=student_item.name,
+                gender=student_item.gender,
+                student_number=student_item.student_number,
+                class_id=batch_data.class_id,
+            )
+            session.add(student_db)
+            existing_numbers.add(student_item.student_number)
+            success_count += 1
+        except Exception as e:
+            errors.append(f"第{idx + 1}条数据「{student_item.name}」创建失败: {str(e)}")
+    session.commit()
+    log_operation(
+        session=session,
+        user_id=perm.user_id,
+        user_type="superuser" if perm.is_superuser else "school_admin",
+        action="batch_create",
+        resource_type="student",
+        detail=f"成功创建 {success_count} 名学生",
+        ip_address=ip_address,
+    )
+    return BatchImportResult(
+        success_count=success_count,
+        fail_count=len(errors),
+        errors=errors,
+    )
 
 
 def get_students(

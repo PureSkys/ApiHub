@@ -10,9 +10,11 @@ from app.school.model import (
     ClassCreate,
     ClassUpdate,
     ClassResponse,
+    ClassBatchCreate,
     StudentCreate,
     StudentUpdate,
     StudentResponse,
+    StudentBatchCreate,
     ExamCreate,
     ExamUpdate,
     ExamResponse,
@@ -26,6 +28,7 @@ from app.school.model import (
     SchoolAdminUpdate,
     SchoolAdminDetailResponse,
     OperationLogResponse,
+    BatchImportResult,
 )
 from app.core.database import SessionDep
 from app.user.route import oauth2_scheme
@@ -160,6 +163,22 @@ def create_class_route(
     return server.create_class(session, class_data, token, ip_address)
 
 
+@class_router.post(
+    "/batch",
+    summary="批量导入班级",
+    response_model=BatchImportResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_classes_batch_route(
+    session: SessionDep,
+    batch_data: ClassBatchCreate,
+    token: str = Depends(oauth2_scheme),
+    request: Request = None,
+):
+    ip_address = request.client.host if request else None
+    return server.create_classes_batch(session, batch_data, token, ip_address)
+
+
 @class_router.get(
     "/",
     summary="获取班级列表",
@@ -248,6 +267,22 @@ def create_student_route(
 ):
     ip_address = request.client.host if request else None
     return server.create_student(session, student, token, ip_address)
+
+
+@student_router.post(
+    "/batch",
+    summary="批量导入学生",
+    response_model=BatchImportResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_students_batch_route(
+    session: SessionDep,
+    batch_data: StudentBatchCreate,
+    token: str = Depends(oauth2_scheme),
+    request: Request = None,
+):
+    ip_address = request.client.host if request else None
+    return server.create_students_batch(session, batch_data, token, ip_address)
 
 
 @student_router.get(

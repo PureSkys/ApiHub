@@ -215,6 +215,23 @@ class ClassResponse(SQLModel):
     updated_at: datetime
 
 
+class ClassBatchItem(SQLModel):
+    name: str = Field(max_length=50)
+    grade: str | None = Field(default=None, max_length=20)
+    description: str | None = Field(default=None, max_length=255)
+
+
+class ClassBatchCreate(SQLModel):
+    school_id: uuid.UUID
+    classes: list[ClassBatchItem] = Field(min_length=1, max_length=100)
+
+
+class BatchImportResult(SQLModel):
+    success_count: int
+    fail_count: int
+    errors: list[str]
+
+
 class StudentCreate(SQLModel):
     name: str = Field(max_length=50)
     gender: str = Field(max_length=10)
@@ -253,6 +270,24 @@ class StudentResponse(SQLModel):
     class_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+
+class StudentBatchItem(SQLModel):
+    name: str = Field(max_length=50)
+    gender: str = Field(max_length=10)
+    student_number: str = Field(max_length=50)
+
+    @field_validator("gender")
+    @classmethod
+    def validate_gender(cls, v: str) -> str:
+        if v not in [Gender.MALE.value, Gender.FEMALE.value]:
+            raise ValueError("性别必须是'男'或'女'")
+        return v
+
+
+class StudentBatchCreate(SQLModel):
+    class_id: uuid.UUID
+    students: list[StudentBatchItem] = Field(min_length=1, max_length=100)
 
 
 class ExamCreate(SQLModel):
