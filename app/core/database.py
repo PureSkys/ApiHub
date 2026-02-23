@@ -9,8 +9,9 @@ from typing import Annotated
 # 如果使用SQLMODEL创建数据库表请在这里导入所有的模型
 from app.sentence import model as sentence_model
 from app.user import model as auth_model
+from app.school import model as school_model
 
-_ = (sentence_model, auth_model)
+_ = (sentence_model, auth_model, school_model)
 
 engine = create_engine(
     str(fastapi_config.SQLMODEL_DATABASE_URI),

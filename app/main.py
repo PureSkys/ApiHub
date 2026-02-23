@@ -5,6 +5,14 @@ from app.user.route import auth_router
 from app.core.database import init_db, close_db
 from app.sentence.route import sentence_route
 from app.core.health import health_router
+from app.school.route import (
+    school_router,
+    class_router,
+    student_router,
+    exam_router,
+    score_router,
+    stats_router,
+)
 
 
 @asynccontextmanager
@@ -34,3 +42,9 @@ app.add_middleware(
 app.include_router(sentence_route, prefix="/sentence", tags=["Sentence"])
 app.include_router(auth_router, prefix="/user", tags=["Auth"])
 app.include_router(health_router, prefix="/health", tags=["Health"])
+app.include_router(school_router, prefix="/school", tags=["School"])
+app.include_router(class_router, prefix="/school/class", tags=["Class"])
+app.include_router(student_router, prefix="/school/student", tags=["Student"])
+app.include_router(exam_router, prefix="/school/exam", tags=["Exam"])
+app.include_router(score_router, prefix="/school/score", tags=["Score"])
+app.include_router(stats_router, prefix="/school/stats", tags=["Stats"])
