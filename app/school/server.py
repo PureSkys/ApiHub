@@ -142,7 +142,7 @@ def create_school(
             action="create",
             resource_type="school",
             resource_id=school_db.id,
-            detail=json.dumps(school.model_dump(), ensure_ascii=False),
+            detail=json.dumps(school.model_dump(mode='json'), ensure_ascii=False),
             ip_address=ip_address,
         )
         return school_db
@@ -197,7 +197,7 @@ def update_school(
             action="update",
             resource_type="school",
             resource_id=school_db.id,
-            detail=json.dumps(school_dict, ensure_ascii=False),
+            detail=json.dumps(school_dict, ensure_ascii=False, default=str),
             ip_address=ip_address,
         )
         return school_db
@@ -295,7 +295,7 @@ def create_class(
             action="create",
             resource_type="class",
             resource_id=class_db.id,
-            detail=json.dumps(class_data.model_dump(), ensure_ascii=False),
+            detail=json.dumps(class_data.model_dump(mode='json'), ensure_ascii=False),
             ip_address=ip_address,
         )
         return class_db
@@ -366,7 +366,7 @@ def update_class(
             action="update",
             resource_type="class",
             resource_id=class_db.id,
-            detail=json.dumps(class_dict, ensure_ascii=False),
+            detail=json.dumps(class_dict, ensure_ascii=False, default=str),
             ip_address=ip_address,
         )
         return class_db
@@ -458,7 +458,7 @@ def create_student(
             action="create",
             resource_type="student",
             resource_id=student_db.id,
-            detail=json.dumps(student.model_dump(), ensure_ascii=False),
+            detail=json.dumps(student.model_dump(mode='json'), ensure_ascii=False),
             ip_address=ip_address,
         )
         return student_db
@@ -568,7 +568,7 @@ def update_student(
             action="update",
             resource_type="student",
             resource_id=student_db.id,
-            detail=json.dumps(student_dict, ensure_ascii=False),
+            detail=json.dumps(student_dict, ensure_ascii=False, default=str),
             ip_address=ip_address,
         )
         return student_db
@@ -648,7 +648,7 @@ def create_exam(
             action="create",
             resource_type="exam",
             resource_id=exam_db.id,
-            detail=json.dumps(exam.model_dump(), ensure_ascii=False),
+            detail=json.dumps(exam.model_dump(mode='json'), ensure_ascii=False),
             ip_address=ip_address,
         )
         return exam_db
@@ -719,7 +719,7 @@ def update_exam(
             action="update",
             resource_type="exam",
             resource_id=exam_db.id,
-            detail=json.dumps(exam_dict, ensure_ascii=False),
+            detail=json.dumps(exam_dict, ensure_ascii=False, default=str),
             ip_address=ip_address,
         )
         return exam_db
@@ -816,7 +816,7 @@ def create_score(
             action="create",
             resource_type="score",
             resource_id=score_db.id,
-            detail=json.dumps(score.model_dump(), ensure_ascii=False),
+            detail=json.dumps(score.model_dump(mode='json'), ensure_ascii=False),
             ip_address=ip_address,
         )
         return score_db
@@ -977,7 +977,7 @@ def update_score(
             action="update",
             resource_type="score",
             resource_id=score_db.id,
-            detail=json.dumps(score_dict, ensure_ascii=False),
+            detail=json.dumps(score_dict, ensure_ascii=False, default=str),
             ip_address=ip_address,
         )
         return score_db
@@ -1334,7 +1334,7 @@ def update_school_admin(
             action="update",
             resource_type="school_admin",
             resource_id=admin_id,
-            detail=json.dumps(admin.model_dump(exclude_unset=True), ensure_ascii=False),
+            detail=json.dumps(admin.model_dump(exclude_unset=True, mode='json'), ensure_ascii=False),
             ip_address=ip_address,
         )
         return SchoolAdminDetailResponse(
