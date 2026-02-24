@@ -229,6 +229,7 @@ class ClassBatchCreate(SQLModel):
 class BatchImportResult(SQLModel):
     success_count: int = Field(description="成功导入数量")
     fail_count: int = Field(description="失败数量")
+    duplicates: list[str] = Field(default=[], description="重复记录列表")
     errors: list[str] = Field(description="错误信息列表")
 
 

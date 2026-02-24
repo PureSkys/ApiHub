@@ -360,6 +360,7 @@ def create_classes_batch(
     return BatchImportResult(
         success_count=success_count,
         fail_count=len(errors),
+        duplicates=[],
         errors=errors,
     )
 
@@ -578,6 +579,7 @@ def create_students_batch(
     return BatchImportResult(
         success_count=success_count,
         fail_count=len(errors),
+        duplicates=[],
         errors=errors,
     )
 
@@ -993,8 +995,10 @@ def create_scores_batch(
         detail=f"成功创建 {success_count} 条成绩记录",
         ip_address=ip_address,
     )
+    fail_count = len(duplicates) + len(errors)
     return {
         "success_count": success_count,
+        "fail_count": fail_count,
         "duplicates": duplicates,
         "errors": errors,
     }
