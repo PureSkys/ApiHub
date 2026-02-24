@@ -1265,12 +1265,22 @@ def get_student_trend(
         for score, exam in results:
             total = 0.0
             count = 0
-            for field_name, _ in SUBJECT_FIELDS[:3]:
+            for field_name in ["chinese", "math", "english", "physics", "history",
+                               "chemistry", "biology", "politics", "geography"]:
                 val = getattr(score, field_name)
                 if val is not None:
                     total += val
                     count += 1
             total_score = total if count > 0 else None
+            total_assigned = 0.0
+            count_assigned = 0
+            for field_name in ["chinese", "math", "english", "physics", "history",
+                               "chemistry_assigned", "biology_assigned", "politics_assigned", "geography_assigned"]:
+                val = getattr(score, field_name)
+                if val is not None:
+                    total_assigned += val
+                    count_assigned += 1
+            total_score_assigned = total_assigned if count_assigned > 0 else None
             trends.append(
                 StudentScoreTrend(
                     student_id=student_id,
@@ -1278,9 +1288,20 @@ def get_student_trend(
                     exam_name=exam.name,
                     exam_date=exam.exam_date,
                     total_score=total_score,
+                    total_score_assigned=total_score_assigned,
                     chinese=score.chinese,
                     math=score.math,
                     english=score.english,
+                    physics=score.physics,
+                    history=score.history,
+                    chemistry=score.chemistry,
+                    chemistry_assigned=score.chemistry_assigned,
+                    biology=score.biology,
+                    biology_assigned=score.biology_assigned,
+                    politics=score.politics,
+                    politics_assigned=score.politics_assigned,
+                    geography=score.geography,
+                    geography_assigned=score.geography_assigned,
                 )
             )
         return trends

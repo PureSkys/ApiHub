@@ -398,10 +398,21 @@ class StudentScoreTrend(SQLModel):
     student_name: str = Field(description="学生姓名")
     exam_name: str = Field(description="考试名称")
     exam_date: date = Field(description="考试日期")
-    total_score: float | None = Field(description="总分（语数英）")
+    total_score: float | None = Field(description="总分（所有科目原始分）")
+    total_score_assigned: float | None = Field(description="总分(赋分)（含赋分科目）")
     chinese: float | None = Field(description="语文成绩")
     math: float | None = Field(description="数学成绩")
     english: float | None = Field(description="英语成绩")
+    physics: float | None = Field(description="物理成绩")
+    history: float | None = Field(description="历史成绩")
+    chemistry: float | None = Field(description="化学成绩")
+    chemistry_assigned: float | None = Field(description="化学赋分")
+    biology: float | None = Field(description="生物成绩")
+    biology_assigned: float | None = Field(description="生物赋分")
+    politics: float | None = Field(description="政治成绩")
+    politics_assigned: float | None = Field(description="政治赋分")
+    geography: float | None = Field(description="地理成绩")
+    geography_assigned: float | None = Field(description="地理赋分")
 
 
 class SchoolAdminCreate(SQLModel):
