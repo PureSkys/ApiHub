@@ -28,7 +28,6 @@ app = FastAPI(
     title="ApiHub",
     description="我的API聚合中心",
     lifespan=lifespan,
-    version="1.0.0",
 )
 # 配置跨域中间件
 # 允许所有跨域的核心配置

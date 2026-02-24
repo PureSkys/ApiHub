@@ -3,6 +3,7 @@ import json
 from typing import Any
 from fastapi import HTTPException, status
 from sqlmodel import Session, select, func, col
+from sqlalchemy import case
 
 from app.school.model import (
     SchoolModel,
@@ -35,6 +36,21 @@ from app.school.model import (
     OperationLogResponse,
     UserPermissionInfo,
     BatchImportResult,
+    SchoolOverviewStats,
+    ClassDetailStats,
+    ExamOverviewStats,
+    ScoreDistribution,
+    SubjectScoreDistribution,
+    StudentRanking,
+    ExamRanking,
+    SubjectComparison,
+    ClassSubjectComparison,
+    ExamComparison,
+    StudentExamComparison,
+    ClassComparison,
+    ExamClassComparison,
+    PassRateStats,
+    ExamPassRateStats,
 )
 from app.user.model import UserModel, UserCreateAndUpdate
 from app.user.server import get_current_user, get_password_hash
@@ -714,8 +730,9 @@ def get_student_scores(
     try:
         statement = (
             select(ScoreModel)
+            .join(ExamModel)
             .where(ScoreModel.student_id == student_id)
-            .order_by(col(ScoreModel.exam).desc())
+            .order_by(ExamModel.exam_date.desc())
         )
         scores = session.exec(statement).all()
         return scores
@@ -1589,3 +1606,522 @@ def get_user_logs(
         session.rollback()
         print(f"查询用户操作日志失败：{str(e)}")
         raise HTTPException(status_code=500, detail="查询用户操作日志失败，请联系管理员！")
+
+
+def get_school_overview(
+    session: Session, school_id: uuid.UUID, token: str
+) -> SchoolOverviewStats:
+    check_school_access(session, token, school_id)
+    school_db = session.get(SchoolModel, school_id)
+    if not school_db:
+        raise HTTPException(status_code=404, detail="学校不存在")
+    try:
+        class_count = session.exec(
+            select(func.count()).where(ClassModel.school_id == school_id)
+        ).one()
+        student_statement = (
+            select(func.count(), func.sum(case((StudentModel.gender == "男", 1), else_=0)),
+                   func.sum(case((StudentModel.gender == "女", 1), else_=0)))
+            .select_from(StudentModel)
+            .join(ClassModel)
+            .where(ClassModel.school_id == school_id)
+        )
+        student_result = session.exec(student_statement).one()
+        total_students = student_result[0] or 0
+        male_count = int(student_result[1] or 0)
+        female_count = int(student_result[2] or 0)
+        exam_count = session.exec(
+            select(func.count()).where(ExamModel.school_id == school_id)
+        ).one()
+        return SchoolOverviewStats(
+            school_id=school_id,
+            school_name=school_db.name,
+            total_classes=class_count,
+            total_students=total_students,
+            total_exams=exam_count,
+            male_count=male_count,
+            female_count=female_count,
+        )
+    except Exception as e:
+        session.rollback()
+        print(f"获取学校概览统计失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="获取学校概览统计失败，请联系管理员！")
+
+
+def get_class_detail_stats(
+    session: Session, class_id: uuid.UUID, token: str
+) -> ClassDetailStats:
+    class_db = session.get(ClassModel, class_id)
+    if not class_db:
+        raise HTTPException(status_code=404, detail="班级不存在")
+    check_school_access(session, token, class_db.school_id)
+    try:
+        student_statement = (
+            select(func.count(), func.sum(case((StudentModel.gender == "男", 1), else_=0)),
+                   func.sum(case((StudentModel.gender == "女", 1), else_=0)))
+            .where(StudentModel.class_id == class_id)
+        )
+        student_result = session.exec(student_statement).one()
+        total_students = student_result[0] or 0
+        male_count = int(student_result[1] or 0)
+        female_count = int(student_result[2] or 0)
+        latest_exam_statement = (
+            select(ExamModel)
+            .join(ScoreModel)
+            .join(StudentModel)
+            .where(StudentModel.class_id == class_id)
+            .order_by(ExamModel.exam_date.desc())
+            .limit(1)
+        )
+        latest_exam = session.exec(latest_exam_statement).first()
+        latest_exam_avg = None
+        latest_exam_name = None
+        if latest_exam:
+            latest_exam_name = latest_exam.name
+            score_statement = (
+                select(ScoreModel)
+                .join(StudentModel)
+                .where(StudentModel.class_id == class_id, ScoreModel.exam_id == latest_exam.id)
+            )
+            scores = session.exec(score_statement).all()
+            total_scores = []
+            for score in scores:
+                total = 0.0
+                count = 0
+                for field_name, _ in SUBJECT_FIELDS[:3]:
+                    val = getattr(score, field_name)
+                    if val is not None:
+                        total += val
+                        count += 1
+                if count > 0:
+                    total_scores.append(total)
+            if total_scores:
+                latest_exam_avg = round(sum(total_scores) / len(total_scores), 2)
+        school_db = session.get(SchoolModel, class_db.school_id)
+        return ClassDetailStats(
+            class_id=class_id,
+            class_name=class_db.name,
+            grade=class_db.grade,
+            school_id=class_db.school_id,
+            school_name=school_db.name if school_db else "",
+            total_students=total_students,
+            male_count=male_count,
+            female_count=female_count,
+            latest_exam_avg=latest_exam_avg,
+            latest_exam_name=latest_exam_name,
+        )
+    except Exception as e:
+        session.rollback()
+        print(f"获取班级详细统计失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="获取班级详细统计失败，请联系管理员！")
+
+
+def get_exam_overview(
+    session: Session, exam_id: uuid.UUID, token: str
+) -> ExamOverviewStats:
+    exam_db = session.get(ExamModel, exam_id)
+    if not exam_db:
+        raise HTTPException(status_code=404, detail="考试不存在")
+    check_school_access(session, token, exam_db.school_id)
+    try:
+        scores = session.exec(
+            select(ScoreModel).where(ScoreModel.exam_id == exam_id)
+        ).all()
+        total_students = len(set(s.student_id for s in scores))
+        total_scores = len(scores)
+        total_score_list = []
+        total_score_assigned_list = []
+        for score in scores:
+            total = 0.0
+            count = 0
+            for field_name in ["chinese", "math", "english", "physics", "history",
+                               "chemistry", "biology", "politics", "geography"]:
+                val = getattr(score, field_name)
+                if val is not None:
+                    total += val
+                    count += 1
+            if count > 0:
+                total_score_list.append(total)
+            total_assigned = 0.0
+            count_assigned = 0
+            for field_name in ["chinese", "math", "english", "physics", "history",
+                               "chemistry_assigned", "biology_assigned", "politics_assigned", "geography_assigned"]:
+                val = getattr(score, field_name)
+                if val is not None:
+                    total_assigned += val
+                    count_assigned += 1
+            if count_assigned > 0:
+                total_score_assigned_list.append(total_assigned)
+        avg_total = round(sum(total_score_list) / total_students, 2) if total_students > 0 and total_score_list else None
+        avg_total_assigned = round(sum(total_score_assigned_list) / total_students, 2) if total_students > 0 and total_score_assigned_list else None
+        highest_total = max(total_score_list) if total_score_list else None
+        highest_total_assigned = max(total_score_assigned_list) if total_score_assigned_list else None
+        lowest_total = min(total_score_list) if total_score_list else None
+        lowest_total_assigned = min(total_score_assigned_list) if total_score_assigned_list else None
+        school_db = session.get(SchoolModel, exam_db.school_id)
+        return ExamOverviewStats(
+            exam_id=exam_id,
+            exam_name=exam_db.name,
+            exam_date=exam_db.exam_date,
+            exam_type=exam_db.exam_type,
+            school_id=exam_db.school_id,
+            school_name=school_db.name if school_db else "",
+            total_students=total_students,
+            total_scores=total_scores,
+            avg_total_score=avg_total,
+            avg_total_score_assigned=avg_total_assigned,
+            highest_total_score=highest_total,
+            highest_total_score_assigned=highest_total_assigned,
+            lowest_total_score=lowest_total,
+            lowest_total_score_assigned=lowest_total_assigned,
+        )
+    except Exception as e:
+        session.rollback()
+        print(f"获取考试概览统计失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="获取考试概览统计失败，请联系管理员！")
+
+
+def get_score_distribution(
+    session: Session, exam_id: uuid.UUID, token: str
+) -> SubjectScoreDistribution:
+    exam_db = session.get(ExamModel, exam_id)
+    if not exam_db:
+        raise HTTPException(status_code=404, detail="考试不存在")
+    check_school_access(session, token, exam_db.school_id)
+    try:
+        scores = session.exec(
+            select(ScoreModel).where(ScoreModel.exam_id == exam_id)
+        ).all()
+        distributions = []
+        for field_name, subject_name in SUBJECT_FIELDS:
+            values = [getattr(s, field_name) for s in scores if getattr(s, field_name) is not None]
+            if not values:
+                continue
+            max_score = 150 if field_name in ["chinese", "math", "english"] else 100
+            range_0_60 = len([v for v in values if v < 60])
+            range_60_70 = len([v for v in values if 60 <= v < 70])
+            range_70_80 = len([v for v in values if 70 <= v < 80])
+            range_80_90 = len([v for v in values if 80 <= v < 90])
+            range_90_100 = len([v for v in values if 90 <= v < 100])
+            range_100_150 = len([v for v in values if v >= 100]) if max_score == 150 else 0
+            distributions.append(ScoreDistribution(
+                subject=subject_name,
+                range_0_60=range_0_60,
+                range_60_70=range_60_70,
+                range_70_80=range_70_80,
+                range_80_90=range_80_90,
+                range_90_100=range_90_100,
+                range_100_150=range_100_150,
+            ))
+        return SubjectScoreDistribution(
+            exam_id=exam_id,
+            exam_name=exam_db.name,
+            distributions=distributions,
+        )
+    except Exception as e:
+        session.rollback()
+        print(f"获取成绩分布统计失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="获取成绩分布统计失败，请联系管理员！")
+
+
+def get_exam_ranking(
+    session: Session, exam_id: uuid.UUID, token: str, limit: int = 50
+) -> ExamRanking:
+    exam_db = session.get(ExamModel, exam_id)
+    if not exam_db:
+        raise HTTPException(status_code=404, detail="考试不存在")
+    check_school_access(session, token, exam_db.school_id)
+    try:
+        statement = (
+            select(ScoreModel, StudentModel, ClassModel)
+            .join(StudentModel, ScoreModel.student_id == StudentModel.id)
+            .join(ClassModel, StudentModel.class_id == ClassModel.id)
+            .where(ScoreModel.exam_id == exam_id)
+        )
+        results = session.exec(statement).all()
+        student_scores = []
+        for score, student, class_ in results:
+            total = 0.0
+            count = 0
+            for field_name in ["chinese", "math", "english", "physics", "history",
+                               "chemistry", "biology", "politics", "geography"]:
+                val = getattr(score, field_name)
+                if val is not None:
+                    total += val
+                    count += 1
+            total_score = total if count > 0 else None
+            total_assigned = 0.0
+            count_assigned = 0
+            for field_name in ["chinese", "math", "english", "physics", "history",
+                               "chemistry_assigned", "biology_assigned", "politics_assigned", "geography_assigned"]:
+                val = getattr(score, field_name)
+                if val is not None:
+                    total_assigned += val
+                    count_assigned += 1
+            total_score_assigned = total_assigned if count_assigned > 0 else None
+            student_scores.append({
+                "student_id": student.id,
+                "student_name": student.name,
+                "class_name": class_.name,
+                "total_score": total_score,
+                "total_score_assigned": total_score_assigned,
+                "score": score,
+            })
+        student_scores.sort(key=lambda x: x["total_score_assigned"] if x["total_score_assigned"] is not None else 0, reverse=True)
+        rankings = []
+        for idx, item in enumerate(student_scores[:limit]):
+            score = item["score"]
+            rankings.append(StudentRanking(
+                rank=idx + 1,
+                student_id=item["student_id"],
+                student_name=item["student_name"],
+                class_name=item["class_name"],
+                total_score=item["total_score"],
+                total_score_assigned=item["total_score_assigned"],
+                chinese=score.chinese,
+                math=score.math,
+                english=score.english,
+                physics=score.physics,
+                history=score.history,
+                chemistry=score.chemistry,
+                chemistry_assigned=score.chemistry_assigned,
+                biology=score.biology,
+                biology_assigned=score.biology_assigned,
+                politics=score.politics,
+                politics_assigned=score.politics_assigned,
+                geography=score.geography,
+                geography_assigned=score.geography_assigned,
+            ))
+        return ExamRanking(
+            exam_id=exam_id,
+            exam_name=exam_db.name,
+            rankings=rankings,
+        )
+    except Exception as e:
+        session.rollback()
+        print(f"获取考试排名失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="获取考试排名失败，请联系管理员！")
+
+
+def get_class_subject_comparison(
+    session: Session, class_id: uuid.UUID, exam_id: uuid.UUID, token: str
+) -> ClassSubjectComparison:
+    class_db = session.get(ClassModel, class_id)
+    if not class_db:
+        raise HTTPException(status_code=404, detail="班级不存在")
+    exam_db = session.get(ExamModel, exam_id)
+    if not exam_db:
+        raise HTTPException(status_code=404, detail="考试不存在")
+    check_school_access(session, token, class_db.school_id)
+    check_school_access(session, token, exam_db.school_id)
+    try:
+        statement = (
+            select(ScoreModel)
+            .join(StudentModel)
+            .where(StudentModel.class_id == class_id, ScoreModel.exam_id == exam_id)
+        )
+        scores = session.exec(statement).all()
+        comparisons = []
+        for field_name, subject_name in SUBJECT_FIELDS:
+            values = [getattr(s, field_name) for s in scores if getattr(s, field_name) is not None]
+            if not values:
+                continue
+            max_score = 150 if field_name in ["chinese", "math", "english"] else 100
+            pass_threshold = 90 if max_score == 150 else 60
+            excellent_threshold = 135 if max_score == 150 else 90
+            pass_count = len([v for v in values if v >= pass_threshold])
+            excellent_count = len([v for v in values if v >= excellent_threshold])
+            comparisons.append(SubjectComparison(
+                subject=subject_name,
+                avg_score=round(sum(values) / len(values), 2),
+                max_score=max(values),
+                min_score=min(values),
+                pass_rate=round(pass_count / len(values) * 100, 2),
+                excellent_rate=round(excellent_count / len(values) * 100, 2),
+            ))
+        return ClassSubjectComparison(
+            class_id=class_id,
+            class_name=class_db.name,
+            comparisons=comparisons,
+        )
+    except Exception as e:
+        session.rollback()
+        print(f"获取班级科目对比失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="获取班级科目对比失败，请联系管理员！")
+
+
+def get_student_exam_comparison(
+    session: Session, student_id: uuid.UUID, token: str
+) -> StudentExamComparison:
+    student_db = session.get(StudentModel, student_id)
+    if not student_db:
+        raise HTTPException(status_code=404, detail="学生不存在")
+    check_school_access(session, token, student_db.class_.school_id)
+    try:
+        statement = (
+            select(ScoreModel, ExamModel)
+            .join(ExamModel, ScoreModel.exam_id == ExamModel.id)
+            .where(ScoreModel.student_id == student_id)
+            .order_by(ExamModel.exam_date)
+        )
+        results = session.exec(statement).all()
+        exams = []
+        for score, exam in results:
+            total = 0.0
+            count = 0
+            for field_name, _ in SUBJECT_FIELDS[:3]:
+                val = getattr(score, field_name)
+                if val is not None:
+                    total += val
+                    count += 1
+            total_score = total if count > 0 else None
+            exams.append(ExamComparison(
+                exam_id=exam.id,
+                exam_name=exam.name,
+                exam_date=exam.exam_date,
+                avg_total_score=total_score,
+                avg_chinese=score.chinese,
+                avg_math=score.math,
+                avg_english=score.english,
+                avg_physics=score.physics,
+                avg_chemistry=score.chemistry,
+                avg_biology=score.biology,
+                avg_history=score.history,
+                avg_politics=score.politics,
+                avg_geography=score.geography,
+            ))
+        return StudentExamComparison(
+            student_id=student_id,
+            student_name=student_db.name,
+            exams=exams,
+        )
+    except Exception as e:
+        session.rollback()
+        print(f"获取学生考试对比失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="获取学生考试对比失败，请联系管理员！")
+
+
+def get_exam_class_comparison(
+    session: Session, exam_id: uuid.UUID, token: str
+) -> ExamClassComparison:
+    exam_db = session.get(ExamModel, exam_id)
+    if not exam_db:
+        raise HTTPException(status_code=404, detail="考试不存在")
+    check_school_access(session, token, exam_db.school_id)
+    try:
+        class_statement = (
+            select(ClassModel)
+            .where(ClassModel.school_id == exam_db.school_id)
+        )
+        classes = session.exec(class_statement).all()
+        class_comparisons = []
+        for class_db in classes:
+            statement = (
+                select(ScoreModel)
+                .join(StudentModel)
+                .where(StudentModel.class_id == class_db.id, ScoreModel.exam_id == exam_id)
+            )
+            scores = session.exec(statement).all()
+            if not scores:
+                continue
+            def calc_avg(field_name: str) -> float | None:
+                values = [getattr(s, field_name) for s in scores if getattr(s, field_name) is not None]
+                return round(sum(values) / len(values), 2) if values else None
+            def calc_total_avg() -> float | None:
+                totals = []
+                for s in scores:
+                    total = 0.0
+                    count = 0
+                    for field_name in ["chinese", "math", "english", "physics", "history",
+                                       "chemistry", "biology", "politics", "geography"]:
+                        val = getattr(s, field_name)
+                        if val is not None:
+                            total += val
+                            count += 1
+                    if count > 0:
+                        totals.append(total)
+                return round(sum(totals) / len(totals), 2) if totals else None
+            def calc_total_assigned_avg() -> float | None:
+                totals = []
+                for s in scores:
+                    total = 0.0
+                    count = 0
+                    for field_name in ["chinese", "math", "english", "physics", "history",
+                                       "chemistry_assigned", "biology_assigned", "politics_assigned", "geography_assigned"]:
+                        val = getattr(s, field_name)
+                        if val is not None:
+                            total += val
+                            count += 1
+                    if count > 0:
+                        totals.append(total)
+                return round(sum(totals) / len(totals), 2) if totals else None
+            class_comparisons.append(ClassComparison(
+                class_id=class_db.id,
+                class_name=class_db.name,
+                avg_total_score=calc_total_avg(),
+                avg_total_score_assigned=calc_total_assigned_avg(),
+                avg_chinese=calc_avg("chinese"),
+                avg_math=calc_avg("math"),
+                avg_english=calc_avg("english"),
+                avg_physics=calc_avg("physics"),
+                avg_chemistry=calc_avg("chemistry"),
+                avg_chemistry_assigned=calc_avg("chemistry_assigned"),
+                avg_biology=calc_avg("biology"),
+                avg_biology_assigned=calc_avg("biology_assigned"),
+                avg_history=calc_avg("history"),
+                avg_politics=calc_avg("politics"),
+                avg_politics_assigned=calc_avg("politics_assigned"),
+                avg_geography=calc_avg("geography"),
+                avg_geography_assigned=calc_avg("geography_assigned"),
+                student_count=len(scores),
+            ))
+        class_comparisons.sort(key=lambda x: x.avg_total_score_assigned or 0, reverse=True)
+        return ExamClassComparison(
+            exam_id=exam_id,
+            exam_name=exam_db.name,
+            classes=class_comparisons,
+        )
+    except Exception as e:
+        session.rollback()
+        print(f"获取考试班级对比失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="获取考试班级对比失败，请联系管理员！")
+
+
+def get_exam_pass_rate(
+    session: Session, exam_id: uuid.UUID, token: str
+) -> ExamPassRateStats:
+    exam_db = session.get(ExamModel, exam_id)
+    if not exam_db:
+        raise HTTPException(status_code=404, detail="考试不存在")
+    check_school_access(session, token, exam_db.school_id)
+    try:
+        scores = session.exec(
+            select(ScoreModel).where(ScoreModel.exam_id == exam_id)
+        ).all()
+        subjects = []
+        for field_name, subject_name in SUBJECT_FIELDS:
+            values = [getattr(s, field_name) for s in scores if getattr(s, field_name) is not None]
+            if not values:
+                continue
+            max_score = 150 if field_name in ["chinese", "math", "english"] else 100
+            pass_threshold = 90 if max_score == 150 else 60
+            excellent_threshold = 135 if max_score == 150 else 90
+            pass_count = len([v for v in values if v >= pass_threshold])
+            excellent_count = len([v for v in values if v >= excellent_threshold])
+            subjects.append(PassRateStats(
+                subject=subject_name,
+                total_count=len(values),
+                pass_count=pass_count,
+                excellent_count=excellent_count,
+                pass_rate=round(pass_count / len(values) * 100, 2),
+                excellent_rate=round(excellent_count / len(values) * 100, 2),
+            ))
+        return ExamPassRateStats(
+            exam_id=exam_id,
+            exam_name=exam_db.name,
+            subjects=subjects,
+        )
+    except Exception as e:
+        session.rollback()
+        print(f"获取考试及格率统计失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="获取考试及格率统计失败，请联系管理员！")

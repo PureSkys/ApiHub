@@ -9,19 +9,34 @@ if TYPE_CHECKING:
     from app.school.model import SchoolAdminModel
 
 
-# 用户数据模型
 class UserModel(SQLModel, table=True):
     __tablename__ = "user"
 
     id: uuid.UUID = Field(
-        default_factory=uuid.uuid7, primary_key=True, index=True, unique=True
+        default_factory=uuid.uuid7,
+        primary_key=True,
+        index=True,
+        unique=True,
     )
-    email: EmailStr = Field(description="用户邮箱", unique=True, max_length=255)
-    hashed_password: str = Field(description="用户密码")
-    nickname: str | None = Field(description="用户昵称", default=None, max_length=8)
-    active: bool = Field(description="用户状态", default=False)
-    is_superuser: bool = Field(description="超级管理员状态", default=False)
-    # 下面关联项目内其他应用的模型
+    email: EmailStr = Field(
+        description="用户邮箱地址，用于登录和身份识别",
+        unique=True,
+        max_length=255,
+    )
+    hashed_password: str = Field(description="用户密码的哈希值")
+    nickname: str | None = Field(
+        description="用户昵称，显示名称",
+        default=None,
+        max_length=8,
+    )
+    active: bool = Field(
+        description="用户激活状态，True表示已激活可正常使用",
+        default=False,
+    )
+    is_superuser: bool = Field(
+        description="超级管理员标识，True表示拥有系统最高权限",
+        default=False,
+    )
     sentence_user_config: "SentenceUserConfigModel" = Relationship(
         back_populates="user",
         cascade_delete=True,
@@ -32,27 +47,26 @@ class UserModel(SQLModel, table=True):
     )
 
 
-# Token模型(返回给前端)
 class Token(BaseModel):
-    access_token: str
-    token_type: str
+    access_token: str = Field(description="JWT访问令牌")
+    token_type: str = Field(description="令牌类型，通常为bearer")
 
 
-# Token内的负载 sub
 class TokenData(BaseModel):
-    id: str | None = None
+    id: str | None = Field(description="用户ID", default=None)
 
 
-# 用户响应模型
 class UserResponse(SQLModel):
-    id: uuid.UUID
-    email: EmailStr
-    nickname: str | None
-    active: bool
+    id: uuid.UUID = Field(description="用户唯一标识符")
+    email: EmailStr = Field(description="用户邮箱地址")
+    nickname: str | None = Field(description="用户昵称")
+    active: bool = Field(description="用户激活状态")
 
 
-# 用户创建和更新模型
 class UserCreateAndUpdate(SQLModel):
-    email: EmailStr
-    hashed_password: str
-    nickname: str | None = Field(default=None)
+    email: EmailStr = Field(description="用户邮箱地址")
+    hashed_password: str = Field(description="用户密码（明文，系统会自动哈希）")
+    nickname: str | None = Field(
+        description="用户昵称，可选，最多8个字符",
+        default=None,
+    )
